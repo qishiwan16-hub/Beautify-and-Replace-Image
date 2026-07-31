@@ -5,7 +5,7 @@
     const STYLE_ID = 'native-bgm-style-v7-0'; 
     const INJECT_STYLE_ID = 'native-bgm-injected-overrides';
     const MENU_BTN_ID = 'st-bgm-ext-btn-v7-0';
-    const SCRIPT_VERSION = '1.0.0';
+    const SCRIPT_VERSION = '1.1.0';
     const EXTENSION_DEFAULT_FOLDER = 'Beautify-and-Replace-Image';
     const EXTENSION_RAW_MANIFEST_URL = 'https://raw.githubusercontent.com/qishiwan16-hub/Beautify-and-Replace-Image/main/manifest.json';
     const BACKEND_BASE_URL = '/api/plugins/image-replacement-ui-enhancement';
@@ -479,6 +479,7 @@
             .bgm-header { display: flex; justify-content: space-between; align-items: center; padding: 15px 20px; border-bottom: 1px solid rgba(0,0,0,0.05); flex-shrink: 0; }
             .bgm-title-block { display: flex; flex-direction: column; }
             .bgm-title { font-weight: bold; font-size: 1.15em; display: flex; align-items: center; gap: 10px; }
+            .bgm-version { font-size: 0.68em; font-weight: normal; opacity: 0.65; }
             .bgm-subtitle { font-size: 0.8em; opacity: 0.6; margin-top: 2px; }
             .bgm-subtitle i { color: var(--SmartThemeQuoteColor); }
             .bgm-close { cursor: pointer; background: none; border: none; padding: 0; opacity: 0.5; font-size: 1.5em; display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; transition: 0.2s; border-radius: 50%; color: inherit; }
@@ -698,8 +699,8 @@
                 <div class="bgm-box ${isDarkMode ? 'bgm-dark' : ''} ${isDevMode ? 'dev-mode-active' : ''}">
                     <div class="bgm-header">
                         <div class="bgm-title-block">
-                            <div class="bgm-title"><i class="fa-solid fa-paw"></i> ${SCRIPT_NAME}</div>
-                            <div class="bgm-subtitle"><i class="fa-solid fa-circle-info"></i> 当前主题: <strong>${currentTheme}</strong> <span class="bgm-storage-state">${storageLabel()}</span></div>
+                            <div class="bgm-title"><i class="fa-solid fa-paw"></i> ${SCRIPT_NAME} <span class="bgm-version">v${SCRIPT_VERSION}</span></div>
+                            <div class="bgm-subtitle"><i class="fa-solid fa-circle-info"></i> 当前主题: <strong>${currentTheme}</strong></div>
                         </div>
                         <div style="display: flex; gap: 5px;">
                             <button class="bgm-theme-toggle ${isDevMode ? 'active' : ''}" id="bgm-dev-toggle" title="开启/关闭创作模式"><i class="fa-solid fa-code"></i></button>
@@ -709,10 +710,9 @@
                     </div>
 
                     <div class="bgm-toolbar">
-                        <div class="bgm-tool-btn" id="btn-tab-storage"><i class="fa-solid fa-trash-can-arrow-up"></i> 清理</div>
+                        <div class="bgm-tool-btn" id="btn-tab-storage"><i class="fa-solid fa-gear"></i> 设置</div>
                         <div class="bgm-tool-btn" id="btn-tab-presets"><i class="fa-solid fa-folder-open"></i> 预设管理</div>
                         <div class="bgm-tool-btn danger-lite" id="btn-clear-current"><i class="fa-solid fa-rotate-left"></i> 一键重置</div>
-                        <div class="bgm-tool-btn" id="btn-check-update"><i class="fa-solid fa-cloud-arrow-down"></i> 检查更新</div>
                     </div>
 
                     <div class="bgm-content">
@@ -837,19 +837,6 @@
             switchPanel('#panel-storage', '#btn-tab-storage');
         });
 
-        $popup.find('#btn-check-update').on('click', async function() {
-            const $button = $(this).addClass('active');
-            await checkExtensionUpdate();
-            if (extensionUpdateState.phase === 'available') {
-                const version = extensionUpdateState.latestVersion ? ` v${extensionUpdateState.latestVersion}` : '';
-                if (confirm(`发现新版本${version}，现在更新并尝试热加载吗？`)) await updateExtension();
-            } else if (window.toastr) {
-                const level = extensionUpdateState.phase === 'error' ? 'error' : 'success';
-                toastr[level](extensionUpdateState.message);
-            }
-            $button.removeClass('active');
-        });
-
         const renderPresets = async () => {
             const presets = await BGMData.loadPresets(currentTheme);
             let html = `<div class="bgm-preset-add"><i class="fa-solid fa-plus"></i> 将当前配置保存为新预设</div>`;
@@ -966,7 +953,26 @@
             }
             globalThemesHtml += `</div></div>`;
 
+            const updateMessage = escapeHtml(extensionUpdateState.message);
             let html = `
+                <div class="bgm-storage-card">
+                    <div class="bgm-storage-title"><i class="fa-solid fa-hard-drive"></i> 存储设置</div>
+                    <div class="bgm-storage-desc">当前配置和替换图片的保存位置。</div>
+                    <div class="bgm-storage-stats">
+                        <span>${storageLabel()}</span>
+                        <span>${serverStorage.mode === 'server' ? '已连接' : '后端未连接'}</span>
+                    </div>
+                </div>
+
+                <div class="bgm-storage-card" style="margin-top:10px;">
+                    <div class="bgm-storage-title"><i class="fa-solid fa-cloud-arrow-down"></i> 扩展更新</div>
+                    <div class="bgm-storage-desc">${updateMessage}</div>
+                    <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                        <button class="bgm-btn-action safe" id="action-check-update">检查更新</button>
+                        ${extensionUpdateState.canUpdate ? '<button class="bgm-btn-action safe" id="action-update-extension">立即更新</button>' : ''}
+                    </div>
+                </div>
+
                 <div class="bgm-storage-card">
                     <div class="bgm-storage-title"><i class="fa-solid fa-magnifying-glass"></i> 当前主题扫描清理</div>
                     <div class="bgm-storage-desc">
@@ -995,6 +1001,21 @@
                 </div>
             `;
             $popup.find('#panel-storage').html(html);
+
+            $popup.find('#action-check-update').on('click', async function() {
+                $(this).prop('disabled', true).text('检查中...');
+                await checkExtensionUpdate();
+                if (window.toastr) {
+                    const level = extensionUpdateState.phase === 'error' ? 'error' : 'success';
+                    toastr[level](extensionUpdateState.message);
+                }
+                await renderStorage();
+            });
+
+            $popup.find('#action-update-extension').on('click', async function() {
+                $(this).prop('disabled', true).text('更新中...');
+                await updateExtension();
+            });
 
             $popup.find('#action-clean-zombies').on('click', async function() {
                 zombieKeys.forEach(k => delete currentData[k]);
