@@ -1,0 +1,11 @@
+{
+  "display_name": "主题一键换图",
+  "loading_order": 10,
+  "requires": [],
+  "optional": [],
+  "js": "index.js",
+  "author": "毛毛雨（二改）",
+  "version": "1.0.0",
+  "description": "主题 CSS 图片替换酒馆扩展",
+  "homePage": "https://github.com/qishiwan16-hub/Beautify-and-Replace-Image"
+}
