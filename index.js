@@ -5,10 +5,14 @@
     const STYLE_ID = 'native-bgm-style-v7-0'; 
     const INJECT_STYLE_ID = 'native-bgm-injected-overrides';
     const MENU_BTN_ID = 'st-bgm-ext-btn-v7-0';
-    const SCRIPT_VERSION = '1.1.0';
+    const SCRIPT_VERSION = '1.2.0';
     const EXTENSION_DEFAULT_FOLDER = 'Beautify-and-Replace-Image';
     const EXTENSION_RAW_MANIFEST_URL = 'https://raw.githubusercontent.com/qishiwan16-hub/Beautify-and-Replace-Image/main/manifest.json';
-    const BACKEND_BASE_URL = '/api/plugins/image-replacement-ui-enhancement';
+    const BACKEND_BASE_URLS = [
+        '/api/plugins/image-replacement-ui-enhancement',
+        '/api/plugins/Backend-for-image-replacement-and-UI-enhancement',
+        '/api/plugins/backend-for-image-replacement-and-ui-enhancement'
+    ];
     const INITIAL_SCRIPT_URL = document.currentScript?.src || '';
     if (typeof window.__briHotCleanup === 'function') window.__briHotCleanup();
     const runtimeTimers = [];
@@ -184,24 +188,50 @@
         mode: 'unknown',
         state: null,
         detectPromise: null,
+        baseUrl: BACKEND_BASE_URLS[0],
+        lastDetectionAt: 0,
+        lastError: '',
         migratedThemes: new Set(),
-        async request(path, options = {}) {
-            const headers = { 'Content-Type': 'application/json', ...(options.headers || {}) };
+        getRequestHeaders() {
+            try {
+                const context = typeof getContext === 'function' ? getContext() : window.SillyTavern?.getContext?.();
+                if (context && typeof context.getRequestHeaders === 'function') return context.getRequestHeaders();
+            } catch (error) {}
+            try {
+                if (typeof window.getRequestHeaders === 'function') return window.getRequestHeaders();
+            } catch (error) {}
+            const headers = { 'Content-Type': 'application/json' };
             if (window.token) headers['X-CSRF-Token'] = window.token;
-            const response = await fetch(`${BACKEND_BASE_URL}${path}`, { cache: 'no-store', ...options, headers });
+            return headers;
+        },
+        async request(path, options = {}) {
+            const headers = { ...this.getRequestHeaders(), ...(options.headers || {}) };
+            const response = await fetch(`${this.baseUrl}${path}`, { cache: 'no-store', credentials: 'same-origin', ...options, headers });
             if (!response.ok) throw new Error((await response.text()) || response.statusText || `HTTP ${response.status}`);
             return response.json();
         },
         async detect(force = false) {
             if (this.detectPromise && !force) return this.detectPromise;
-            if (!force && this.mode !== 'unknown') return this.mode;
+            if (!force && this.mode === 'server') return this.mode;
+            if (!force && this.mode === 'local' && Date.now() - this.lastDetectionAt < 15000) return this.mode;
             this.detectPromise = (async () => {
-                try {
-                    await this.request('/status');
-                    this.mode = 'server';
-                } catch (error) {
-                    this.mode = 'local';
+                this.lastDetectionAt = Date.now();
+                this.lastError = '';
+                for (const baseUrl of BACKEND_BASE_URLS) {
+                    this.baseUrl = baseUrl;
+                    try {
+                        const status = await this.request('/status');
+                        if (status && status.ok) {
+                            this.mode = 'server';
+                            this.state = null;
+                            return this.mode;
+                        }
+                    } catch (error) {
+                        this.lastError = String(error && error.message || error);
+                    }
                 }
+                this.baseUrl = BACKEND_BASE_URLS[0];
+                this.mode = 'local';
                 return this.mode;
             })();
             try { return await this.detectPromise; } finally { this.detectPromise = null; }
@@ -962,6 +992,7 @@
                         <span>${storageLabel()}</span>
                         <span>${serverStorage.mode === 'server' ? '已连接' : '后端未连接'}</span>
                     </div>
+                    <button class="bgm-btn-action safe" id="action-detect-backend">重新检测后端</button>
                 </div>
 
                 <div class="bgm-storage-card" style="margin-top:10px;">
@@ -1001,6 +1032,16 @@
                 </div>
             `;
             $popup.find('#panel-storage').html(html);
+
+            $popup.find('#action-detect-backend').on('click', async function() {
+                $(this).prop('disabled', true).text('检测中...');
+                const mode = await serverStorage.detect(true);
+                if (window.toastr) {
+                    if (mode === 'server') toastr.success(`后端连接成功：${serverStorage.baseUrl}`);
+                    else toastr.error(`后端未连接${serverStorage.lastError ? `：${serverStorage.lastError}` : ''}`);
+                }
+                await renderStorage();
+            });
 
             $popup.find('#action-check-update').on('click', async function() {
                 $(this).prop('disabled', true).text('检查中...');
