@@ -5,7 +5,7 @@
     const STYLE_ID = 'native-bgm-style-v7-0'; 
     const INJECT_STYLE_ID = 'native-bgm-injected-overrides';
     const MENU_BTN_ID = 'st-bgm-ext-btn-v7-0';
-    const SCRIPT_VERSION = '1.2.0';
+    const SCRIPT_VERSION = '1.3.0';
     const EXTENSION_DEFAULT_FOLDER = 'Beautify-and-Replace-Image';
     const EXTENSION_RAW_MANIFEST_URL = 'https://raw.githubusercontent.com/qishiwan16-hub/Beautify-and-Replace-Image/main/manifest.json';
     const BACKEND_BASE_URLS = [
@@ -31,6 +31,42 @@
     function escapeHtml(unsafe) {
         if (typeof unsafe !== 'string') return unsafe;
         return unsafe.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+    }
+
+    function legacyPresetId(name, index) {
+        const source = `${String(name || 'preset')}\u0000${index}`;
+        let hash = 2166136261;
+        for (let i = 0; i < source.length; i++) {
+            hash ^= source.charCodeAt(i);
+            hash = Math.imul(hash, 16777619);
+        }
+        return `bgm-${(hash >>> 0).toString(36)}`;
+    }
+
+    function createPresetId() {
+        if (window.crypto && typeof window.crypto.randomUUID === 'function') return window.crypto.randomUUID();
+        return `bgm-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+    }
+
+    function normalizePresets(presets) {
+        if (!Array.isArray(presets)) return [];
+        const usedIds = new Set();
+        let activeFound = false;
+        return presets.map((rawPreset, index) => {
+            const preset = rawPreset && typeof rawPreset === 'object' ? rawPreset : {};
+            let id = String(preset.id || '').trim() || legacyPresetId(preset.name, index);
+            if (usedIds.has(id)) id = createPresetId();
+            usedIds.add(id);
+            const isActive = !activeFound && !!preset.isActive;
+            if (isActive) activeFound = true;
+            return {
+                ...preset,
+                id,
+                name: String(preset.name || `预设 ${index + 1}`).trim() || `预设 ${index + 1}`,
+                data: preset.data && typeof preset.data === 'object' ? preset.data : {},
+                isActive
+            };
+        });
     }
 
     // 优化：同时支持计算旧版 Base64 字符串和新版 Blob(文件) 的体积
@@ -325,21 +361,22 @@
             try {
                 await serverStorage.migrateTheme(themeName);
                 const state = await serverStorage.loadState();
-                return Array.isArray(state.presets[themeName]) ? state.presets[themeName] : [];
+                return normalizePresets(state.presets[themeName]);
             } catch (error) { setLocalFallback(); }
         }
-        return localLoadPresets(themeName);
+        return normalizePresets(await localLoadPresets(themeName));
     };
     BGMData.savePresets = async function(themeName, presetsArray) {
+        const normalizedPresets = normalizePresets(presetsArray);
         if (await serverStorage.detect() === 'server') {
             try {
                 const state = await serverStorage.loadState();
-                state.presets[themeName] = Array.isArray(presetsArray) ? presetsArray : [];
+                state.presets[themeName] = normalizedPresets;
                 await serverStorage.saveState(state);
                 return;
             } catch (error) { setLocalFallback(); }
         }
-        return localSavePresets(themeName, presetsArray);
+        return localSavePresets(themeName, normalizedPresets);
     };
     BGMData.getAllThemeStats = async function() {
         if (await serverStorage.detect() === 'server') {
@@ -372,6 +409,13 @@
         }
         return localClearAllDatabase();
     };
+
+    async function clearActivePreset(themeName) {
+        const presets = await BGMData.loadPresets(themeName);
+        if (!presets.some(preset => preset.isActive)) return;
+        presets.forEach(preset => { preset.isActive = false; });
+        await BGMData.savePresets(themeName, presets);
+    }
 
     function storageLabel() {
         if (serverStorage.mode === 'server') return '存储：酒馆后端';
@@ -547,8 +591,14 @@
             .bgm-preset-add:hover { color: var(--SmartThemeQuoteColor); opacity: 1; background: rgba(255,255,255,0.5); }
             .bgm-preset-item { display: flex; align-items: center; background: rgba(255,255,255,0.7); padding: 12px; border-radius: 12px; border: 1px solid rgba(0,0,0,0.05); gap: 10px; transition: all 0.2s; }
             .bgm-preset-item:hover { transform: translateY(-2px); box-shadow: 0 4px 10px rgba(0,0,0,0.05); background: white; }
-            .bgm-preset-name { flex: 1; font-weight: normal; cursor: pointer; display: flex; align-items: center; gap: 8px; }
-            .bgm-preset-actions { display: flex; gap: 5px; }
+            .bgm-preset-item.active { border-color: #35a85b; box-shadow: inset 3px 0 0 #35a85b; }
+            .bgm-preset-indicator { width: 9px; height: 9px; flex: 0 0 9px; border-radius: 50%; background: rgba(0,0,0,0.14); }
+            .bgm-preset-item.active .bgm-preset-indicator { background: #35c46a; box-shadow: 0 0 0 3px rgba(53,196,106,0.16); }
+            .bgm-preset-name { flex: 1; min-width: 0; font-weight: normal; display: flex; align-items: center; gap: 8px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+            .bgm-preset-actions { display: flex; align-items: center; gap: 5px; }
+            .bgm-preset-switch { min-height: 30px; padding: 5px 9px; border: 1px solid var(--SmartThemeQuoteColor); border-radius: 7px; background: transparent; color: var(--SmartThemeQuoteColor); cursor: pointer; }
+            .bgm-preset-switch:hover { background: var(--SmartThemeQuoteColor); color: white; }
+            .bgm-preset-switch:disabled { border-color: #35a85b; background: rgba(53,168,91,0.12); color: #35a85b; cursor: default; }
             .bgm-icon-btn { width: 30px; height: 30px; border-radius: 6px; display: flex; align-items: center; justify-content: center; cursor: pointer; opacity: 0.5; transition: 0.2s; }
             .bgm-icon-btn:hover { background: rgba(0,0,0,0.05); opacity: 1; color: var(--SmartThemeQuoteColor); }
             .bgm-icon-btn.del:hover { color: #e57373; background: #fff2f2; }
@@ -603,6 +653,13 @@
             .bgm-box.bgm-dark .bgm-item-preview { background: rgba(0,0,0,0.5); border-color: rgba(255,255,255,0.1); }
             .bgm-box.bgm-dark .bgm-close:hover, .bgm-box.bgm-dark .bgm-theme-toggle:hover { background: rgba(255,255,255,0.1); }
             .bgm-box.bgm-dark .bgm-preset-add:hover { background: rgba(0,0,0,0.3); color: #eee; }
+            .bgm-box.bgm-dark .bgm-preset-item.active { border-color: #35c46a; }
+
+            @media (max-width: 600px) {
+                .bgm-preset-item { align-items: flex-start; flex-wrap: wrap; }
+                .bgm-preset-name { min-width: calc(100% - 24px); }
+                .bgm-preset-actions { width: 100%; justify-content: flex-end; }
+            }
             
             .bgm-box.bgm-dark .bgm-global-item { background: rgba(0,0,0,0.3); border-color: rgba(255,255,255,0.1); }
             .bgm-box.bgm-dark .bgm-global-item:hover { background: rgba(0,0,0,0.5); border-color: rgba(229, 115, 115, 0.5); }
@@ -799,7 +856,7 @@
 
         // =================== 创作模式专属事件 ===================
         // 1. 替换 CSS 原链接
-        $popup.on('click', '.bgm-btn-dev-replace', function() {
+        $popup.on('click', '.bgm-btn-dev-replace', async function() {
             const targetUrl = $(this).attr('data-target');
             const newUrl = prompt(`要替换的目标链接：\n${targetUrl}\n\n输入新的图片链接：`, targetUrl);
             if (newUrl !== null && newUrl.trim() !== '' && newUrl.trim() !== targetUrl) {
@@ -807,6 +864,7 @@
                 let css = $ta.val();
                 css = css.split(targetUrl).join(newUrl.trim());
                 $ta.val(css).trigger('input'); 
+                await clearActivePreset(currentTheme);
                 if (window.toastr) toastr.success("CSS 源码链接已修改");
                 refreshList();
             }
@@ -873,9 +931,11 @@
             if (presets.length > 0) {
                 presets.forEach((p, index) => {
                     html += `
-                        <div class="bgm-preset-item">
-                            <div class="bgm-preset-name" data-index="${index}"><i class="fa-solid fa-box-archive"></i> ${escapeHtml(p.name)}</div>
+                        <div class="bgm-preset-item ${p.isActive ? 'active' : ''}" data-index="${index}">
+                            <span class="bgm-preset-indicator" title="${p.isActive ? '当前使用中' : '未使用'}"></span>
+                            <div class="bgm-preset-name"><i class="fa-solid fa-box-archive"></i> ${escapeHtml(p.name)}</div>
                             <div class="bgm-preset-actions">
+                                <button class="bgm-preset-switch" data-index="${index}" type="button" ${p.isActive ? 'disabled' : ''}><i class="fa-solid fa-repeat"></i> ${p.isActive ? '当前' : '切换'}</button>
                                 <div class="bgm-icon-btn rename" data-index="${index}" title="重命名"><i class="fa-solid fa-pencil"></i></div>
                                 <div class="bgm-icon-btn del" data-index="${index}" title="删除"><i class="fa-solid fa-trash"></i></div>
                             </div>
@@ -890,22 +950,29 @@
             if (name && name.trim()) {
                 const data = await BGMData.loadForTheme(currentTheme);
                 let presets = await BGMData.loadPresets(currentTheme);
-                presets.push({ name: name.trim(), data });
+                presets.forEach(preset => { preset.isActive = false; });
+                presets.push({ id: createPresetId(), name: name.trim(), data, isActive: true });
                 await BGMData.savePresets(currentTheme, presets);
                 await renderPresets();
                 if (window.toastr) toastr.success("预设保存成功");
             }
         });
 
-        $popup.on('click', '.bgm-preset-name', async function() {
-            const index = $(this).data('index');
+        const switchPreset = async index => {
             const presets = await BGMData.loadPresets(currentTheme);
             if (presets[index] && confirm(`应用预设 "${presets[index].name}"？\n当前未保存的修改将被覆盖。`)) {
                 await BGMData.saveForTheme(currentTheme, presets[index].data);
+                presets.forEach((preset, presetIndex) => { preset.isActive = presetIndex === index; });
+                await BGMData.savePresets(currentTheme, presets);
                 await applyInjectedOverrides();
-                if (window.toastr) toastr.success("预设应用成功");
-                refreshList();
+                await renderPresets();
+                if (window.toastr) toastr.success(`已切换为预设“${presets[index].name}”`);
+                await refreshList();
             }
+        };
+
+        $popup.on('click', '.bgm-preset-switch', async function() {
+            await switchPreset(Number($(this).data('index')));
         });
 
         $popup.on('click', '.bgm-icon-btn.del', async function() {
@@ -1061,6 +1128,7 @@
             $popup.find('#action-clean-zombies').on('click', async function() {
                 zombieKeys.forEach(k => delete currentData[k]);
                 await BGMData.saveForTheme(currentTheme, currentData);
+                await clearActivePreset(currentTheme);
                 blobCache.forEach(url => URL.revokeObjectURL(url));
                 blobCache.clear();
                 if (window.toastr) toastr.success(`成功释放 ${zombieSizeMB.toFixed(2)} MB 空间！`);
@@ -1100,6 +1168,7 @@
         $popup.find('#btn-clear-current').on('click', async function() {
             if (confirm(`确定要清空当前主题 (${currentTheme}) 的所有图片替换吗？\n(这不会删除您保存的预设)`)) {
                 await BGMData.saveForTheme(currentTheme, {});
+                await clearActivePreset(currentTheme);
                 await applyInjectedOverrides();
                 if (window.toastr) toastr.success("已重置本主题配置");
                 refreshList();
@@ -1123,6 +1192,7 @@
             data[currentTargetUrl] = file; // 直接存储文件对象（Blob）
             
             await BGMData.saveForTheme(theme, data);
+            await clearActivePreset(theme);
             await applyInjectedOverrides();
             if (window.toastr) toastr.success(`图片已保存`);
             refreshList();
@@ -1137,6 +1207,7 @@
             if (data[targetUrl]) {
                 delete data[targetUrl];
                 await BGMData.saveForTheme(theme, data);
+                await clearActivePreset(theme);
                 await applyInjectedOverrides();
                 if (window.toastr) toastr.success("已恢复原样式");
                 refreshList();
