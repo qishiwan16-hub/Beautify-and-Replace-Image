@@ -5,7 +5,7 @@
     const STYLE_ID = 'native-bgm-style-v7-0'; 
     const INJECT_STYLE_ID = 'native-bgm-injected-overrides';
     const MENU_BTN_ID = 'st-bgm-ext-btn-v7-0';
-    const SCRIPT_VERSION = '1.3.1';
+    const SCRIPT_VERSION = '1.3.2';
     const EXTENSION_DEFAULT_FOLDER = 'Beautify-and-Replace-Image';
     const EXTENSION_RAW_MANIFEST_URL = 'https://raw.githubusercontent.com/qishiwan16-hub/Beautify-and-Replace-Image/main/manifest.json';
     const BACKEND_BASE_URLS = [
@@ -596,8 +596,8 @@
             .bgm-preset-item.active .bgm-preset-indicator { background: #35c46a; box-shadow: 0 0 0 3px rgba(53,196,106,0.16); }
             .bgm-preset-name { flex: 1; min-width: 0; font-weight: normal; display: flex; align-items: center; gap: 8px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
             .bgm-preset-actions { display: flex; align-items: center; gap: 5px; }
-            .bgm-preset-switch { min-height: 30px; padding: 5px 9px; border: 1px solid var(--SmartThemeQuoteColor); border-radius: 7px; background: transparent; color: var(--SmartThemeQuoteColor); cursor: pointer; }
-            .bgm-preset-switch:hover { background: var(--SmartThemeQuoteColor); color: white; }
+            .bgm-preset-switch, .bgm-preset-save { min-height: 30px; padding: 5px 9px; border: 1px solid var(--SmartThemeQuoteColor); border-radius: 7px; background: transparent; color: var(--SmartThemeQuoteColor); cursor: pointer; }
+            .bgm-preset-switch:hover, .bgm-preset-save:hover { background: var(--SmartThemeQuoteColor); color: white; }
             .bgm-preset-switch:disabled { border-color: #35a85b; background: rgba(53,168,91,0.12); color: #35a85b; cursor: default; }
             .bgm-icon-btn { width: 30px; height: 30px; border-radius: 6px; display: flex; align-items: center; justify-content: center; cursor: pointer; opacity: 0.5; transition: 0.2s; }
             .bgm-icon-btn:hover { background: rgba(0,0,0,0.05); opacity: 1; color: var(--SmartThemeQuoteColor); }
@@ -939,6 +939,7 @@
                             <div class="bgm-preset-name"><i class="fa-solid fa-box-archive"></i> ${escapeHtml(p.name)}</div>
                             <div class="bgm-preset-actions">
                                 <button class="bgm-preset-switch" data-index="${index}" type="button" ${p.isActive ? 'disabled' : ''}><i class="fa-solid fa-repeat"></i> ${p.isActive ? '当前' : '切换'}</button>
+                                <button class="bgm-preset-save" data-index="${index}" type="button" title="用当前配置覆盖此预设"><i class="fa-solid fa-floppy-disk"></i> 保存</button>
                                 <div class="bgm-icon-btn rename" data-index="${index}" title="重命名"><i class="fa-solid fa-pencil"></i></div>
                                 <div class="bgm-icon-btn del" data-index="${index}" title="删除"><i class="fa-solid fa-trash"></i></div>
                             </div>
@@ -976,6 +977,18 @@
 
         $popup.on('click', '.bgm-preset-switch', async function() {
             await switchPreset(Number($(this).data('index')));
+        });
+
+        $popup.on('click', '.bgm-preset-save', async function() {
+            const index = Number($(this).data('index'));
+            const presets = await BGMData.loadPresets(currentTheme);
+            const preset = presets[index];
+            if (!preset || !confirm(`用当前配置覆盖预设“${preset.name}”？`)) return;
+            preset.data = await BGMData.loadForTheme(currentTheme);
+            presets.forEach((item, presetIndex) => { item.isActive = presetIndex === index; });
+            await BGMData.savePresets(currentTheme, presets);
+            await renderPresets();
+            if (window.toastr) toastr.success(`当前配置已保存到预设“${preset.name}”`);
         });
 
         $popup.on('click', '.bgm-icon-btn.del', async function() {
