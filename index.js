@@ -5,7 +5,7 @@
     const STYLE_ID = 'native-bgm-style-v7-0'; 
     const INJECT_STYLE_ID = 'native-bgm-injected-overrides';
     const MENU_BTN_ID = 'st-bgm-ext-btn-v7-0';
-    const SCRIPT_VERSION = '1.3.0';
+    const SCRIPT_VERSION = '1.3.1';
     const EXTENSION_DEFAULT_FOLDER = 'Beautify-and-Replace-Image';
     const EXTENSION_RAW_MANIFEST_URL = 'https://raw.githubusercontent.com/qishiwan16-hub/Beautify-and-Replace-Image/main/manifest.json';
     const BACKEND_BASE_URLS = [
@@ -23,6 +23,11 @@
 
     let isNukingDB = false;
     let blobCache = new Map(); 
+
+    function getBlobObjectUrl(blob) {
+        if (!blobCache.has(blob)) blobCache.set(blob, URL.createObjectURL(blob));
+        return blobCache.get(blob);
+    }
 
     function escapeRegExp(string) {
         return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -492,12 +497,7 @@
                 let injectUrl;
                 // 核心修复：如果存的是原生二进制 Blob (File) 对象，走光速通道
                 if (fileData instanceof Blob) {
-                    if (blobCache.has(fileData)) {
-                        injectUrl = blobCache.get(fileData);
-                    } else {
-                        injectUrl = URL.createObjectURL(fileData);
-                        blobCache.set(fileData, injectUrl);
-                    }
+                    injectUrl = getBlobObjectUrl(fileData);
                 } else {
                     // 兼容你以前存的老版 Base64 字符串
                     injectUrl = fileData;
@@ -727,15 +727,16 @@
                 // 处理预览图的 URL，如果是 Blob 就临时生成一个用于显示的地址
                 let previewSrc = activeDisplayUrl;
                 if (activeDisplayUrl instanceof Blob) {
-                    previewSrc = URL.createObjectURL(activeDisplayUrl);
+                    previewSrc = getBlobObjectUrl(activeDisplayUrl);
                 }
 
-                const isLikelyImage = activeDisplayUrl instanceof Blob || /^(http|data:)/i.test(previewSrc);
+                // 后端图片使用 /api/plugins/... 相对地址；交给 img 实际加载，失败时再显示占位图。
+                const isLikelyImage = activeDisplayUrl instanceof Blob || (typeof previewSrc === 'string' && previewSrc.trim() !== '');
                 const imgStyle = isLikelyImage ? '' : 'display:none;';
                 const iconStyle = isLikelyImage ? 'display:none;' : 'display:block;';
                 const badgeHTML = isOverridden ? `<span class="bgm-badge"><i class="fa-solid fa-check"></i> 已替换</span>` : '';
                 
-                let textUrl = originalUrl;
+                let textUrl = isOverridden ? String(activeDisplayUrl || '') : originalUrl;
                 if (activeDisplayUrl instanceof Blob) {
                     textUrl = `[已替换本地文件: ${getSizeMB(activeDisplayUrl)} MB]`;
                 } else if (textUrl.length > 30 && textUrl.startsWith('data:image')) {
@@ -744,6 +745,8 @@
 
                 let displaySelector = [...new Set(item.selectors)].join(', ');
                 const safeUrl = escapeHtml(originalUrl);
+                const safePreviewSrc = escapeHtml(String(previewSrc || ''));
+                const safeTextUrl = escapeHtml(textUrl);
 
                 // 第一行：正常的重置和选择图片功能
                 const actionsHTML = isOverridden ? `
@@ -764,14 +767,14 @@
                 listHTML += `
                     <div class="bgm-item ${isOverridden ? 'is-overridden' : ''}">
                         <div class="bgm-item-preview">
-                            <img src="${escapeHtml(previewSrc)}" style="${imgStyle}" onerror="$(this).hide().siblings('.bgm-fallback-icon').show()">
+                            <img src="${safePreviewSrc}" style="${imgStyle}" onerror="$(this).hide().siblings('.bgm-fallback-icon').show()">
                             <i class="fa-solid fa-image bgm-fallback-icon" style="${iconStyle}"></i>
                         </div>
                         <div class="bgm-item-info">
                             <div class="bgm-item-selector">${displaySelector}</div>
                             <div class="bgm-meta-row">
                                 ${badgeHTML}
-                                <div class="bgm-item-url" title="${safeUrl}">${textUrl}</div>
+                                <div class="bgm-item-url" title="${safeTextUrl}">${safeTextUrl}</div>
                             </div>
                             <div class="bgm-item-actions">${actionsHTML}</div>
                         </div>
