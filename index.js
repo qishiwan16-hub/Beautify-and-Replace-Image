@@ -5,7 +5,7 @@
     const STYLE_ID = 'native-bgm-style-v7-0'; 
     const INJECT_STYLE_ID = 'native-bgm-injected-overrides';
     const MENU_BTN_ID = 'st-bgm-ext-btn-v7-0';
-    const SCRIPT_VERSION = '1.4.4';
+    const SCRIPT_VERSION = '1.4.5';
     const EXTENSION_DEFAULT_FOLDER = 'Beautify-and-Replace-Image';
     const EXTENSION_RAW_MANIFEST_URL = 'https://raw.githubusercontent.com/qishiwan16-hub/Beautify-and-Replace-Image/main/manifest.json';
     const BACKEND_BASE_URLS = [
@@ -730,6 +730,7 @@
             .bgm-storage-title { font-weight: bold; font-size: 0.95em; color: var(--SmartThemeQuoteColor); display: flex; align-items: center; gap: 8px; }
             .bgm-storage-desc { font-size: 0.85em; opacity: 0.7; line-height: 1.4; }
             .bgm-storage-stats { background: rgba(0,0,0,0.03); padding: 8px 12px; border-radius: 8px; font-family: monospace; font-size: 0.85em; display: flex; justify-content: space-between; }
+            .bgm-setting-select { width: 100%; min-height: 36px; padding: 7px 10px; border: 1px solid rgba(0,0,0,0.14); border-radius: 7px; background: rgba(255,255,255,0.72); color: inherit; }
             .bgm-btn-action { padding: 8px 15px; border-radius: 8px; border: none; cursor: pointer; font-size: 0.9em; font-weight: bold; transition: 0.2s; }
             .bgm-btn-action.safe { background: var(--SmartThemeQuoteColor); color: white; }
             .bgm-btn-action.safe:hover { filter: brightness(1.1); box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
@@ -791,6 +792,7 @@
             .bgm-box.bgm-dark .bgm-tool-btn:hover { background: rgba(255,255,255,0.1); }
             .bgm-box.bgm-dark .bgm-storage-card, .bgm-box.bgm-dark .bgm-preset-item, .bgm-box.bgm-dark .bgm-item { background: rgba(0,0,0,0.3); border-color: rgba(255,255,255,0.1); color: #eee; }
             .bgm-box.bgm-dark .bgm-storage-stats { background: rgba(0,0,0,0.5); }
+            .bgm-box.bgm-dark .bgm-setting-select { background: rgba(0,0,0,0.4); border-color: rgba(255,255,255,0.16); color: #eee; }
             
             .bgm-box.bgm-dark .bgm-btn-reset { background: rgba(255,255,255,0.1); color: #ccc; border-color: transparent; }
             .bgm-box.bgm-dark .bgm-btn-reset:hover { background: rgba(255,0,0,0.2); color: #e57373; }
@@ -829,6 +831,15 @@
             .bgm-batch-preview { position: relative; width: 100%; aspect-ratio: 16 / 7; min-height: 130px; overflow: hidden; border: 1px solid rgba(0,0,0,0.1); border-radius: 7px; background: rgba(0,0,0,0.035); }
             .bgm-batch-preview img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; background: transparent; }
             .bgm-batch-preview-status { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; gap: 7px; padding: 10px; font-size: 0.76em; opacity: 0.58; text-align: center; }
+            .bgm-batch-download-actions { display: flex; gap: 8px; }
+            .bgm-batch-download-actions button { flex: 1; min-height: 34px; padding: 8px 10px; border: 1px solid rgba(0,0,0,0.12); border-radius: 7px; background: rgba(255,255,255,0.62); color: inherit; cursor: pointer; }
+            .bgm-batch-download-actions button:disabled { cursor: default; opacity: 0.42; }
+            .bgm-batch-download-upload { border-color: var(--SmartThemeQuoteColor) !important; color: var(--SmartThemeQuoteColor) !important; }
+            .bgm-batch-download-source { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.76em; opacity: 0.68; }
+            .bgm-batch-download-badge { display: none; padding: 2px 7px; border-radius: 6px; background: #35a85b; color: white; font-size: 0.72em; white-space: nowrap; }
+            .bgm-batch-table-row.has-download-replacement .bgm-batch-download-badge { display: inline-flex; }
+            .bgm-batch-download-file { display: none !important; }
+            .bgm-batch-download-progress { min-height: 20px; margin-top: 8px; font-size: 0.8em; opacity: 0.72; }
             .bgm-batch-modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; }
             .bgm-batch-modal-actions button { padding: 8px 14px; border-radius: 8px; border: 1px solid rgba(0,0,0,0.12); background: rgba(255,255,255,0.64); color: inherit; cursor: pointer; }
             .bgm-batch-modal-actions .bgm-batch-confirm { border-color: var(--SmartThemeQuoteColor); background: var(--SmartThemeQuoteColor); color: white; }
@@ -838,7 +849,7 @@
             .bgm-batch-page-title { min-width: 0; font-weight: 700; font-size: 1em; display: flex; align-items: center; gap: 8px; }
             .bgm-box .bgm-batch-page textarea, .bgm-box .bgm-batch-page input, .bgm-box .bgm-batch-page button, .bgm-box .bgm-batch-page img { position: static !important; transform: none !important; box-sizing: border-box; }
             .bgm-box .bgm-batch-page .bgm-batch-link-lines { width: 100% !important; max-width: none !important; }
-            .bgm-box .bgm-batch-page .bgm-batch-order button, .bgm-box .bgm-batch-page .bgm-batch-modal-actions button, .bgm-box .bgm-batch-page .bgm-batch-insert-links, .bgm-box .bgm-batch-page .bgm-batch-preview-trigger, .bgm-box .bgm-batch-page .bgm-download-result-copy { width: auto !important; }
+            .bgm-box .bgm-batch-page .bgm-batch-order button, .bgm-box .bgm-batch-page .bgm-batch-modal-actions button, .bgm-box .bgm-batch-page .bgm-batch-insert-links, .bgm-box .bgm-batch-page .bgm-batch-preview-trigger, .bgm-box .bgm-batch-page .bgm-download-result-copy, .bgm-box .bgm-batch-page .bgm-batch-download-actions button { width: auto !important; }
             .bgm-box .bgm-batch-page .bgm-batch-new-link, .bgm-box .bgm-batch-page .bgm-batch-preview-new { width: 100% !important; max-width: none !important; }
             .bgm-box .bgm-batch-page .bgm-batch-preview img { position: absolute !important; inset: 0 !important; width: 100% !important; height: 100% !important; max-width: none !important; min-width: 0 !important; object-fit: contain !important; }
             .bgm-box.bgm-dark .bgm-batch-page-back, .bgm-box.bgm-dark .bgm-batch-modal-actions button { background: rgba(255,255,255,0.08) !important; border-color: rgba(255,255,255,0.16) !important; color: #eee !important; }
@@ -847,6 +858,7 @@
             .bgm-box.bgm-dark .bgm-batch-table-row, .bgm-box.bgm-dark .bgm-batch-preview { border-color: rgba(255,255,255,0.12); background: rgba(0,0,0,0.3); }
             .bgm-box.bgm-dark .bgm-batch-index { border-color: rgba(255,255,255,0.1); }
             .bgm-box.bgm-dark .bgm-batch-preview-trigger { background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.16); color: #eee; }
+            .bgm-box.bgm-dark .bgm-batch-download-actions button { background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.16); color: #eee; }
             .bgm-box.bgm-dark .bgm-batch-order { border-color: rgba(255,255,255,0.16); }
             .bgm-box.bgm-dark .bgm-batch-order button { background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.14); }
             .bgm-box.bgm-dark .bgm-batch-order button.active { background: var(--SmartThemeQuoteColor); }
@@ -1024,6 +1036,7 @@
                         <div class="bgm-sub-panel" id="panel-presets"></div>
                         <div class="bgm-sub-panel" id="panel-storage"></div>
                         <div class="bgm-sub-panel" id="panel-batch-links"></div>
+                        <div class="bgm-sub-panel" id="panel-batch-download"></div>
                         <div class="bgm-sub-panel" id="panel-batch-download-result"></div>
                         <div class="bgm-list active-sub" id="panel-main">${listHTML}</div>
                     </div>
@@ -1042,22 +1055,23 @@
 
         const panelAbortController = new AbortController();
         let popupClosed = false;
+        let batchDownloadPageCleanup = null;
         const showBatchDownloadResult = ({ zip, filename, directUrl = '', directError = '', expiresAt = '' }) => {
             const linkContent = directUrl
                 ? `<div class="bgm-download-result-row"><input class="bgm-download-result-url" readonly value="${escapeHtml(directUrl)}"><button type="button" class="bgm-download-result-copy"><i class="fa-solid fa-copy"></i> 复制</button></div><div class="bgm-download-result-note">直链约 24 小时后失效${expiresAt ? `，有效期至 ${escapeHtml(new Date(expiresAt).toLocaleString())}` : ''}。其他浏览器需能访问当前酒馆地址。</div>`
-                : `<div class="bgm-download-result-note">未生成直链：${escapeHtml(directError || '主题后端未连接或版本过旧')}。本地 ZIP 已正常下载。</div>`;
+                : `<div class="bgm-download-result-note">未生成直链：${escapeHtml(directError || '主题后端未连接或版本过旧')}。ZIP 已完成打包，可点击下方按钮下载。</div>`;
             const $panel = $popup.find('#panel-batch-download-result');
             $panel.off('.bgmDownloadResult').html(`
                 <div class="bgm-batch-page bgm-download-result-page">
                     <div class="bgm-batch-page-header">
                         <button type="button" class="bgm-batch-page-back" title="返回图片列表" aria-label="返回图片列表"><i class="fa-solid fa-arrow-left"></i></button>
-                        <div class="bgm-batch-page-title"><i class="fa-solid fa-file-zipper"></i> 批量下载完成</div>
+                        <div class="bgm-batch-page-title"><i class="fa-solid fa-file-zipper"></i> 批量打包完成</div>
                     </div>
                     <div class="bgm-download-result-summary">
                         <div class="bgm-batch-modal-hint">${escapeHtml(filename)}</div>
                         ${linkContent}
                     </div>
-                    <div class="bgm-batch-modal-actions"><button type="button" class="bgm-batch-cancel">返回列表</button><button type="button" class="bgm-batch-confirm bgm-download-again"><i class="fa-solid fa-download"></i> 再次下载</button></div>
+                    <div class="bgm-batch-modal-actions"><button type="button" class="bgm-batch-cancel">返回列表</button><button type="button" class="bgm-batch-confirm bgm-download-again"><i class="fa-solid fa-download"></i> 下载 ZIP</button></div>
                 </div>`);
             $popup.find('.bgm-sub-panel').removeClass('active');
             $popup.find('.bgm-tool-btn').removeClass('active');
@@ -1081,6 +1095,7 @@
         const closePopup = () => {
             popupClosed = true;
             panelAbortController.abort();
+            if (batchDownloadPageCleanup) batchDownloadPageCleanup();
             $popup.fadeOut(200, () => $popup.remove());
         };
         $popup.find('.bgm-close').on('click', closePopup);
@@ -1116,11 +1131,38 @@
         $popup.on('click', (e) => { if ($(e.target).hasClass('bgm-overlay')) closePopup(); });
 
         const refreshList = async () => { 
+            if (batchDownloadPageCleanup) batchDownloadPageCleanup();
             $('.bgm-overlay').remove(); 
             await showBgmPopup();       
         };
 
+        const bindBatchPreviewState = $image => {
+            const image = $image[0];
+            const $status = $image.siblings('.bgm-batch-preview-status');
+            const src = String($image.attr('src') || '').trim();
+            $image.off('.bgmPreview');
+            if (!src) {
+                $image.hide();
+                $status.show();
+                return;
+            }
+            const finish = loaded => {
+                $image.toggle(loaded);
+                $status.html(loaded ? '' : '<i class="fa-solid fa-circle-exclamation"></i><span>图片预览加载失败</span>').toggle(!loaded);
+            };
+            $image.show();
+            $status.html('<i class="fa-solid fa-spinner fa-spin"></i><span>加载预览中...</span>').show();
+            $image.one('load.bgmPreview', () => finish(true));
+            $image.one('error.bgmPreview', () => finish(false));
+            if (image.complete) queueMicrotask(() => finish(image.naturalWidth > 0));
+        };
+        const bindBatchPreviewStates = $scope => $scope.find('.bgm-batch-preview img').each(function() { bindBatchPreviewState($(this)); });
+
         const openBatchLinkPanel = () => {
+            if (batchDownloadPageCleanup) {
+                batchDownloadPageCleanup();
+                $popup.find('#panel-batch-download').empty();
+            }
             let linkOrder = 'forward';
             let linksInserted = false;
             const orderedItems = () => linkOrder === 'reverse' ? cssOrderedUrls.slice().reverse() : cssOrderedUrls.slice();
@@ -1170,27 +1212,7 @@
                 $popup.find('#panel-main').show();
                 $popup.find('.bgm-content').scrollTop(0);
             };
-            const bindPreviewState = $image => {
-                const image = $image[0];
-                const $status = $image.siblings('.bgm-batch-preview-status');
-                const src = String($image.attr('src') || '').trim();
-                $image.off('.bgmPreview');
-                if (!src) {
-                    $image.hide();
-                    $status.show();
-                    return;
-                }
-                const finish = loaded => {
-                    $image.toggle(loaded);
-                    $status.html(loaded ? '' : '<i class="fa-solid fa-circle-exclamation"></i><span>图片预览加载失败</span>').toggle(!loaded);
-                };
-                $image.show();
-                $status.html('<i class="fa-solid fa-spinner fa-spin"></i><span>加载预览中...</span>').show();
-                $image.one('load.bgmPreview', () => finish(true));
-                $image.one('error.bgmPreview', () => finish(false));
-                if (image.complete) queueMicrotask(() => finish(image.naturalWidth > 0));
-            };
-            const bindPreviewStates = () => $panel.find('.bgm-batch-preview img').each(function() { bindPreviewState($(this)); });
+            const bindPreviewStates = () => bindBatchPreviewStates($panel);
             const updatePreview = $input => {
                 const value = String($input.val() || '').trim();
                 const $preview = $input.closest('.bgm-batch-table-row').find('.bgm-batch-new-preview');
@@ -1201,7 +1223,7 @@
                 } else {
                     $preview.attr('src', value);
                 }
-                bindPreviewState($preview);
+                bindBatchPreviewState($preview);
             };
             const currentLines = () => String($panel.find('.bgm-batch-link-lines').val() || '').replace(/\r/g, '').split('\n');
             const yieldForPaint = () => new Promise(resolve => requestAnimationFrame(() => setTimeout(resolve, 0)));
@@ -1244,7 +1266,7 @@
                 const imageIndex = Number($row.data('image-index'));
                 const $preview = $row.find('.bgm-batch-original-preview');
                 $preview.attr('src', cssOrderedUrls[imageIndex]?.originalUrl || '');
-                bindPreviewState($preview);
+                bindBatchPreviewState($preview);
             });
             $panel.on('click.bgmBatchLinks', '.bgm-batch-preview-new', function() {
                 updatePreview($(this).closest('.bgm-batch-table-row').find('.bgm-batch-new-link'));
@@ -1279,54 +1301,196 @@
             });
         };
 
-        $popup.on('click', '#bgm-batch-download', async function() {
+        const openBatchDownloadPanel = () => {
             if (!cssOrderedUrls.length) return;
-            const $button = $(this), oldHtml = $button.html();
-            $button.prop('disabled', true).html('<i class="fa-solid fa-spinner fa-spin"></i> 下载中');
-            const entries = [], failed = [];
-            try {
-            for (let index = 0; index < cssOrderedUrls.length; index++) {
-                const url = cssOrderedUrls[index].originalUrl;
+            if (batchDownloadPageCleanup) batchDownloadPageCleanup();
+            const replacements = new Map();
+            const previewUrls = new Map();
+            const buildRows = () => cssOrderedUrls.map((item, index) => {
+                const displayIndex = String(index + 1).padStart(3, '0');
+                const selector = [...new Set(item.selectors || [])].join(', ') || '未知区域';
+                return `<div class="bgm-batch-table-row" data-image-index="${index}">
+                    <div class="bgm-batch-index">${displayIndex}</div>
+                    <div class="bgm-batch-card-content">
+                        <div class="bgm-batch-card-head">
+                            <div class="bgm-batch-card-selector">${escapeHtml(selector)} <span>#${displayIndex}</span></div>
+                            <span class="bgm-batch-download-badge"><i class="fa-solid fa-check"></i> 本地替换</span>
+                        </div>
+                        <div class="bgm-batch-card-url" title="${escapeHtml(item.originalUrl)}">${escapeHtml(item.originalUrl)}</div>
+                        <div class="bgm-batch-preview"><img class="bgm-batch-download-preview" src="${escapeHtml(item.originalUrl)}" loading="lazy" alt="下载图片预览"><div class="bgm-batch-preview-status"><i class="fa-solid fa-spinner fa-spin"></i><span>加载预览中...</span></div></div>
+                        <div class="bgm-batch-download-actions">
+                            <button type="button" class="bgm-batch-download-upload"><i class="fa-solid fa-image"></i> 上传新图片</button>
+                            <button type="button" class="bgm-batch-download-restore" disabled><i class="fa-solid fa-rotate-left"></i> 还原</button>
+                        </div>
+                        <div class="bgm-batch-download-source" title="使用当前主题 CSS 原链接">使用 CSS 原图</div>
+                        <input type="file" class="bgm-batch-download-file" accept="image/*,.png,.jpg,.jpeg,.gif,.webp,.bmp,.svg">
+                    </div>
+                </div>`;
+            }).join('');
+            const $panel = $popup.find('#panel-batch-download');
+            $panel.off('.bgmBatchDownload').html(`
+                <div class="bgm-batch-page bgm-batch-download-page">
+                    <div class="bgm-batch-page-header">
+                        <button type="button" class="bgm-batch-page-back" title="返回图片列表" aria-label="返回图片列表"><i class="fa-solid fa-arrow-left"></i></button>
+                        <div class="bgm-batch-page-title"><i class="fa-solid fa-file-zipper"></i> 批量下载清单</div>
+                    </div>
+                    <div class="bgm-batch-modal-hint">未上传替换图的项目从当前主题 CSS 原链接下载；本地替换只改变本次 ZIP。</div>
+                    <div class="bgm-batch-download-summary">共 ${cssOrderedUrls.length} 张，全部使用 CSS 原图</div>
+                    <div class="bgm-batch-table-body">${buildRows()}</div>
+                    <div class="bgm-batch-download-progress" role="status" aria-live="polite"></div>
+                    <div class="bgm-batch-modal-actions"><button type="button" class="bgm-batch-cancel">取消</button><button type="button" class="bgm-batch-confirm bgm-batch-download-start"><i class="fa-solid fa-box-archive"></i> 开始打包</button></div>
+                </div>`);
+            $popup.find('.bgm-sub-panel').removeClass('active');
+            $popup.find('.bgm-tool-btn').removeClass('active');
+            $popup.find('#panel-main').hide();
+            $panel.addClass('active');
+            $popup.find('.bgm-content').scrollTop(0);
+            bindBatchPreviewStates($panel);
+
+            let disposed = false;
+            const cleanup = () => {
+                if (disposed) return;
+                disposed = true;
+                previewUrls.forEach(url => URL.revokeObjectURL(url));
+                previewUrls.clear();
+                $panel.off('.bgmBatchDownload');
+                if (batchDownloadPageCleanup === cleanup) batchDownloadPageCleanup = null;
+            };
+            batchDownloadPageCleanup = cleanup;
+            const returnToMain = () => {
+                cleanup();
+                $panel.removeClass('active').empty();
+                $popup.find('#panel-main').show();
+                $popup.find('.bgm-content').scrollTop(0);
+            };
+            const updateSummary = () => {
+                const replaced = replacements.size;
+                $panel.find('.bgm-batch-download-summary').text(replaced
+                    ? `${replaced} 张使用本地替换，${cssOrderedUrls.length - replaced} 张使用 CSS 原图`
+                    : `共 ${cssOrderedUrls.length} 张，全部使用 CSS 原图`);
+            };
+            const applyReplacement = (index, file) => {
+                const $row = $panel.find(`.bgm-batch-table-row[data-image-index="${index}"]`);
+                const oldPreviewUrl = previewUrls.get(index);
+                if (oldPreviewUrl) URL.revokeObjectURL(oldPreviewUrl);
+                const previewUrl = URL.createObjectURL(file);
+                previewUrls.set(index, previewUrl);
+                replacements.set(index, file);
+                $row.addClass('has-download-replacement');
+                $row.find('.bgm-batch-download-source').text(`本地替换：${file.name}（${getSizeMB(file)} MB）`).attr('title', file.name);
+                $row.find('.bgm-batch-download-restore').prop('disabled', false);
+                const $preview = $row.find('.bgm-batch-download-preview').attr('src', previewUrl);
+                bindBatchPreviewState($preview);
+                updateSummary();
+            };
+            const restoreOriginal = index => {
+                const $row = $panel.find(`.bgm-batch-table-row[data-image-index="${index}"]`);
+                const previewUrl = previewUrls.get(index);
+                if (previewUrl) URL.revokeObjectURL(previewUrl);
+                previewUrls.delete(index);
+                replacements.delete(index);
+                $row.removeClass('has-download-replacement');
+                $row.find('.bgm-batch-download-source').text('使用 CSS 原图').attr('title', '使用当前主题 CSS 原链接');
+                $row.find('.bgm-batch-download-restore').prop('disabled', true);
+                const $preview = $row.find('.bgm-batch-download-preview').attr('src', cssOrderedUrls[index]?.originalUrl || '');
+                bindBatchPreviewState($preview);
+                updateSummary();
+            };
+
+            $panel.on('click.bgmBatchDownload', '.bgm-batch-page-back, .bgm-batch-cancel', returnToMain);
+            $panel.on('click.bgmBatchDownload', '.bgm-batch-download-upload', function() {
+                $(this).closest('.bgm-batch-table-row').find('.bgm-batch-download-file').click();
+            });
+            $panel.on('change.bgmBatchDownload', '.bgm-batch-download-file', function() {
+                const file = this.files?.[0];
+                const index = Number($(this).closest('.bgm-batch-table-row').data('image-index'));
+                $(this).val('');
+                if (!file) return;
+                if (!String(file.type || '').startsWith('image/') && !/\.(png|jpe?g|gif|webp|bmp|svg)$/i.test(file.name)) {
+                    if (window.toastr) toastr.error('请选择图片文件');
+                    return;
+                }
+                applyReplacement(index, file);
+            });
+            $panel.on('click.bgmBatchDownload', '.bgm-batch-download-restore', function() {
+                restoreOriginal(Number($(this).closest('.bgm-batch-table-row').data('image-index')));
+            });
+            $panel.on('click.bgmBatchDownload', '.bgm-batch-download-start', async function() {
+                const $button = $(this);
+                const idleHtml = $button.html();
+                const $progress = $panel.find('.bgm-batch-download-progress');
+                const entries = [], failed = [];
+                let completed = false;
+                $button.prop('disabled', true).html('<i class="fa-solid fa-spinner fa-spin"></i> 处理中...');
+                $panel.find('.bgm-batch-download-actions button').prop('disabled', true);
+                $panel.find('.bgm-batch-page-back, .bgm-batch-cancel').prop('disabled', true);
                 try {
-                    const response = await fetch(url, { cache: 'no-store' });
-                    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-                    const blob = await response.blob();
-                    if (!blob.size) throw new Error('Empty image');
-                    entries.push({ name: getBatchImageName(currentTheme, index, imageExtensionFromBlob(blob, url)), data: blob });
-                } catch (error) { failed.push({ index: index + 1, url, error: String(error?.message || error) }); }
-            }
-            if (failed.length) {
-                const text = failed.map(item => `${String(item.index).padStart(2, '0')}\t${item.url}\t${item.error}`).join('\n');
-                entries.push({ name: '下载失败序号.txt', data: new TextEncoder().encode(`失败序号\t原链接\t原因\n${text}\n`) });
-            }
-            if (entries.length) {
-                const zip = await createBatchZip(entries);
-                const filename = `${sanitizeFileName(currentTheme)}-${batchTimestamp()}.zip`;
-                downloadBatchBlob(zip, filename);
-                let directUrl = '', directError = '', expiresAt = '';
-                $button.html('<i class="fa-solid fa-link"></i> 生成直链');
-                try {
-                    const uploaded = await uploadBatchZip(zip, filename);
-                    directUrl = uploaded.absoluteUrl;
-                    expiresAt = uploaded.expiresAt || '';
+                    for (let index = 0; index < cssOrderedUrls.length; index++) {
+                        const item = cssOrderedUrls[index];
+                        const replacement = replacements.get(index);
+                        $progress.html(`<i class="fa-solid fa-spinner fa-spin"></i> 正在处理 ${index + 1} / ${cssOrderedUrls.length}`);
+                        if (replacement) {
+                            entries.push({ name: getBatchImageName(currentTheme, index, imageExtensionFromBlob(replacement, replacement.name)), data: replacement });
+                            continue;
+                        }
+                        try {
+                            const response = await fetch(item.originalUrl, { cache: 'no-store' });
+                            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                            const blob = await response.blob();
+                            if (!blob.size) throw new Error('Empty image');
+                            entries.push({ name: getBatchImageName(currentTheme, index, imageExtensionFromBlob(blob, item.originalUrl)), data: blob });
+                        } catch (error) {
+                            failed.push({ index: index + 1, url: item.originalUrl, error: String(error?.message || error) });
+                        }
+                    }
+                    if (failed.length) {
+                        const text = failed.map(item => `${String(item.index).padStart(3, '0')}\t${item.url}\t${item.error}`).join('\n');
+                        entries.push({ name: '下载失败序号.txt', data: new TextEncoder().encode(`失败序号\t原链接\t原因\n${text}\n`) });
+                    }
+                    if (!entries.length) throw new Error('没有可写入压缩包的图片');
+                    $progress.html('<i class="fa-solid fa-spinner fa-spin"></i> 正在生成 ZIP');
+                    const zip = await createBatchZip(entries);
+                    const filename = `${sanitizeFileName(currentTheme)}-${batchTimestamp()}.zip`;
+                    let directUrl = '', directError = '', expiresAt = '';
+                    $progress.html('<i class="fa-solid fa-spinner fa-spin"></i> 正在生成下载直链');
+                    try {
+                        const uploaded = await uploadBatchZip(zip, filename);
+                        directUrl = uploaded.absoluteUrl;
+                        expiresAt = uploaded.expiresAt || '';
+                    } catch (error) {
+                        directError = String(error && error.message || error);
+                    }
+                    if (localStorage.getItem('ST_BGM_BatchDownloadMode') === 'auto') downloadBatchBlob(zip, filename);
+                    completed = true;
+                    cleanup();
+                    $panel.removeClass('active').empty();
+                    if (!popupClosed) showBatchDownloadResult({ zip, filename, directUrl, directError, expiresAt });
+                    if (window.toastr) {
+                        const level = failed.length || !directUrl ? 'warning' : 'success';
+                        const auto = localStorage.getItem('ST_BGM_BatchDownloadMode') === 'auto';
+                        const summary = failed.length
+                            ? `批量打包完成：${failed.length} 张失败，详情见 ZIP 内 TXT`
+                            : `批量打包完成：${replacements.size} 张本地替换，${cssOrderedUrls.length - replacements.size} 张 CSS 原图${auto ? '，已自动下载' : ''}`;
+                        toastr[level](summary);
+                    }
                 } catch (error) {
-                    directError = String(error && error.message || error);
+                    $progress.html(`<i class="fa-solid fa-circle-exclamation"></i> ${escapeHtml(error && error.message || error)}`);
+                    if (window.toastr) toastr.error(`批量下载失败：${error && error.message || error}`);
+                } finally {
+                    if (!completed && !disposed) {
+                        $button.prop('disabled', false).html(idleHtml);
+                        $panel.find('.bgm-batch-page-back, .bgm-batch-cancel').prop('disabled', false);
+                        $panel.find('.bgm-batch-download-upload').prop('disabled', false);
+                        $panel.find('.bgm-batch-download-restore').each(function() {
+                            const index = Number($(this).closest('.bgm-batch-table-row').data('image-index'));
+                            $(this).prop('disabled', !replacements.has(index));
+                        });
+                    }
                 }
-                if (!popupClosed) showBatchDownloadResult({ zip, filename, directUrl, directError, expiresAt });
-                if (window.toastr) {
-                    const level = failed.length || !directUrl ? 'warning' : 'success';
-                    const summary = failed.length
-                        ? `批量下载处理完成：${failed.length} 张失败，详情见 ZIP 内 TXT`
-                        : directUrl ? `批量下载处理完成：已下载 ${cssOrderedUrls.length} 张并生成直链` : `批量下载处理完成：已下载 ${cssOrderedUrls.length} 张，直链未生成`;
-                    toastr[level](summary);
-                }
-            }
-            } catch (error) {
-                if (window.toastr) toastr.error(`批量下载失败：${error && error.message || error}`);
-            } finally {
-                if (!popupClosed) $button.prop('disabled', false).html(oldHtml);
-            }
-        });
+            });
+        };
+
+        $popup.on('click', '#bgm-batch-download', openBatchDownloadPanel);
 
         $popup.on('click', '#bgm-batch-import-images', () => $popup.find('#bgm-batch-image-input').click());
         $popup.find('#bgm-batch-image-input').on('change', async function(event) {
@@ -1419,6 +1583,10 @@
 
 
         const switchPanel = (targetId, btnId) => {
+            if (targetId !== '#panel-batch-download' && batchDownloadPageCleanup) {
+                batchDownloadPageCleanup();
+                $popup.find('#panel-batch-download').empty();
+            }
             const isClosing = $popup.find(targetId).hasClass('active');
             $popup.find('.bgm-sub-panel').removeClass('active');
             $popup.find('.bgm-tool-btn').removeClass('active');
@@ -1594,6 +1762,7 @@
             globalThemesHtml += `</div></div>`;
 
             const updateMessage = escapeHtml(extensionUpdateState.message);
+            const batchDownloadMode = localStorage.getItem('ST_BGM_BatchDownloadMode') === 'auto' ? 'auto' : 'manual';
             let html = `
                 <div class="bgm-storage-card">
                     <div class="bgm-storage-title"><i class="fa-solid fa-hard-drive"></i> 存储设置</div>
@@ -1603,6 +1772,15 @@
                         <span>${serverStorage.mode === 'server' ? '已连接' : '后端未连接'}</span>
                     </div>
                     <button class="bgm-btn-action safe" id="action-detect-backend">重新检测后端</button>
+                </div>
+
+                <div class="bgm-storage-card" style="margin-top:10px;">
+                    <div class="bgm-storage-title"><i class="fa-solid fa-file-zipper"></i> 批量下载方式</div>
+                    <div class="bgm-storage-desc">选择 ZIP 打包完成后的下载行为。两种模式都会保留结果页和下载直链。</div>
+                    <select class="bgm-setting-select" id="setting-batch-download-mode">
+                        <option value="manual" ${batchDownloadMode === 'manual' ? 'selected' : ''}>手动下载</option>
+                        <option value="auto" ${batchDownloadMode === 'auto' ? 'selected' : ''}>自动下载</option>
+                    </select>
                 </div>
 
                 <div class="bgm-storage-card" style="margin-top:10px;">
@@ -1642,6 +1820,12 @@
                 </div>
             `;
             $popup.find('#panel-storage').html(html);
+
+            $popup.find('#setting-batch-download-mode').on('change', function() {
+                const mode = String($(this).val()) === 'auto' ? 'auto' : 'manual';
+                localStorage.setItem('ST_BGM_BatchDownloadMode', mode);
+                if (window.toastr) toastr.success(mode === 'auto' ? '批量下载已设为自动下载' : '批量下载已设为手动下载');
+            });
 
             $popup.find('#action-detect-backend').on('click', async function() {
                 $(this).prop('disabled', true).text('检测中...');
