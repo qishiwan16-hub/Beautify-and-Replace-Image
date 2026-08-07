@@ -5,7 +5,7 @@
     const STYLE_ID = 'native-bgm-style-v7-0'; 
     const INJECT_STYLE_ID = 'native-bgm-injected-overrides';
     const MENU_BTN_ID = 'st-bgm-ext-btn-v7-0';
-    const SCRIPT_VERSION = '1.4.1';
+    const SCRIPT_VERSION = '1.4.2';
     const EXTENSION_DEFAULT_FOLDER = 'Beautify-and-Replace-Image';
     const EXTENSION_RAW_MANIFEST_URL = 'https://raw.githubusercontent.com/qishiwan16-hub/Beautify-and-Replace-Image/main/manifest.json';
     const BACKEND_BASE_URLS = [
@@ -457,6 +457,63 @@
         const end = [];
         writeZipU32(end, 0x06054b50); writeZipU16(end, 0); writeZipU16(end, 0); writeZipU16(end, entries.length); writeZipU16(end, entries.length); writeZipU32(end, centralSize); writeZipU32(end, offset); writeZipU16(end, 0);
         return new Blob([...local, ...central, new Uint8Array(end)], { type: 'application/zip' });
+    }
+
+    async function inflateBatchZipEntry(bytes) {
+        if (typeof DecompressionStream !== 'function') throw new Error('当前浏览器不支持解压普通 ZIP，请使用本插件批量下载生成的 ZIP');
+        const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('deflate-raw'));
+        return new Uint8Array(await new Response(stream).arrayBuffer());
+    }
+
+    async function extractBatchImagesFromZip(file) {
+        const bytes = new Uint8Array(await file.arrayBuffer());
+        const readU16 = pos => bytes[pos] | (bytes[pos + 1] << 8);
+        const readU32 = pos => (bytes[pos] | (bytes[pos + 1] << 8) | (bytes[pos + 2] << 16) | (bytes[pos + 3] << 24)) >>> 0;
+        const minimum = Math.max(0, bytes.length - 65557);
+        let eocd = -1;
+        for (let pos = bytes.length - 22; pos >= minimum; pos--) {
+            if (readU32(pos) === 0x06054b50) { eocd = pos; break; }
+        }
+        if (eocd < 0) throw new Error(`“${file.name}”不是有效 ZIP`);
+        const entryCount = readU16(eocd + 10);
+        let centralPos = readU32(eocd + 16);
+        const decoder = new TextDecoder('utf-8');
+        const images = [];
+        let totalBytes = 0;
+        for (let entryIndex = 0; entryIndex < entryCount; entryIndex++) {
+            if (centralPos + 46 > bytes.length || readU32(centralPos) !== 0x02014b50) throw new Error('ZIP 目录损坏或使用了不支持的 ZIP64 格式');
+            const flags = readU16(centralPos + 8);
+            const method = readU16(centralPos + 10);
+            const compressedSize = readU32(centralPos + 20);
+            const uncompressedSize = readU32(centralPos + 24);
+            const nameLength = readU16(centralPos + 28);
+            const extraLength = readU16(centralPos + 30);
+            const commentLength = readU16(centralPos + 32);
+            const localOffset = readU32(centralPos + 42);
+            const entryName = decoder.decode(bytes.slice(centralPos + 46, centralPos + 46 + nameLength)).replace(/\\/g, '/');
+            centralPos += 46 + nameLength + extraLength + commentLength;
+            if (entryName.endsWith('/') || /(^|\/)__MACOSX\//i.test(entryName) || !/\.(png|jpe?g|gif|webp|bmp|svg)$/i.test(entryName)) continue;
+            if (flags & 0x0001) throw new Error(`ZIP 内的“${entryName}”已加密`);
+            if (!uncompressedSize || uncompressedSize > 50 * 1024 * 1024) throw new Error(`“${entryName}”为空或超过 50 MB`);
+            totalBytes += uncompressedSize;
+            if (images.length >= 1000 || totalBytes > 512 * 1024 * 1024) throw new Error('单个 ZIP 最多 1000 张图片且解压后不能超过 512 MB');
+            if (localOffset + 30 > bytes.length || readU32(localOffset) !== 0x04034b50) throw new Error(`“${entryName}”的 ZIP 条目损坏`);
+            const dataStart = localOffset + 30 + readU16(localOffset + 26) + readU16(localOffset + 28);
+            const compressed = bytes.slice(dataStart, dataStart + compressedSize);
+            let data;
+            if (method === 0) data = compressed;
+            else if (method === 8) data = await inflateBatchZipEntry(compressed);
+            else throw new Error(`“${entryName}”使用了不支持的压缩方式`);
+            if (data.length !== uncompressedSize) throw new Error(`“${entryName}”解压后大小不正确`);
+            const extension = (entryName.match(/\.([^.]+)$/) || [])[1]?.toLowerCase() || 'png';
+            const mime = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif', webp: 'image/webp', bmp: 'image/bmp', svg: 'image/svg+xml' }[extension];
+            const name = entryName.split('/').pop() || `image-${images.length + 1}.${extension}`;
+            const image = typeof File === 'function'
+                ? new File([data], name, { type: mime || 'application/octet-stream' })
+                : Object.assign(new Blob([data], { type: mime || 'application/octet-stream' }), { name });
+            images.push(image);
+        }
+        return images;
     }
     function batchTimestamp() {
         const date = new Date();
@@ -952,7 +1009,7 @@
                     </div>
                     
                     <input type="file" id="bgm-file-input" accept="image/*" style="display:none;">
-                    <input type="file" id="bgm-batch-image-input" accept="image/*" multiple style="display:none;">
+                    <input type="file" id="bgm-batch-image-input" accept="image/*,.zip,application/zip" multiple style="display:none;">
                 </div>
             </div>
         `;
@@ -1108,6 +1165,7 @@
             const $button = $(this), oldHtml = $button.html();
             $button.prop('disabled', true).html('<i class="fa-solid fa-spinner fa-spin"></i> 下载中');
             const entries = [], failed = [];
+            try {
             for (let index = 0; index < cssOrderedUrls.length; index++) {
                 const url = cssOrderedUrls[index].originalUrl;
                 try {
@@ -1136,36 +1194,61 @@
                     directError = String(error && error.message || error);
                 }
                 showBatchDownloadResult({ zip, filename, directUrl, directError, expiresAt });
-                if (window.toastr) toastr[failed.length ? 'warning' : 'success'](failed.length ? `下载完成，${failed.length} 张失败，详情见 TXT` : `已下载 ${cssOrderedUrls.length} 张图片`);
+                if (window.toastr) {
+                    const level = failed.length || !directUrl ? 'warning' : 'success';
+                    const summary = failed.length
+                        ? `批量下载处理完成：${failed.length} 张失败，详情见 ZIP 内 TXT`
+                        : directUrl ? `批量下载处理完成：已下载 ${cssOrderedUrls.length} 张并生成直链` : `批量下载处理完成：已下载 ${cssOrderedUrls.length} 张，直链未生成`;
+                    toastr[level](summary);
+                }
             }
-            $button.prop('disabled', false).html(oldHtml);
+            } catch (error) {
+                if (window.toastr) toastr.error(`批量下载失败：${error && error.message || error}`);
+            } finally {
+                if (!popupClosed) $button.prop('disabled', false).html(oldHtml);
+            }
         });
 
         $popup.on('click', '#bgm-batch-import-images', () => $popup.find('#bgm-batch-image-input').click());
         $popup.find('#bgm-batch-image-input').on('change', async function(event) {
-            const files = Array.from(event.target.files || []).filter(file => String(file.type || '').startsWith('image/') || /\.(png|jpe?g|gif|webp|bmp|svg)$/i.test(file.name));
+            const selectedFiles = Array.from(event.target.files || []);
             $(this).val('');
-            if (!files.length) return;
-            const byBaseName = new Map(cssOrderedUrls.map((item, index) => [imageBaseName(item.originalUrl), index]));
-            const matches = new Map(), unmatched = [];
-            files.forEach(file => {
-                const baseName = imageBaseName(file.name);
-                const numberMatch = baseName.match(/(?:^|\u2014|[-_\s])(\d+)$/);
-                let index = numberMatch ? Number(numberMatch[1]) - 1 : -1;
-                if (index < 0 || index >= cssOrderedUrls.length) index = byBaseName.has(baseName) ? byBaseName.get(baseName) : -1;
-                if (index < 0 || index >= cssOrderedUrls.length) unmatched.push(file.name); else matches.set(index, file);
-            });
-            if (!matches.size) { if (window.toastr) toastr.error('没有文件名能匹配当前美化的图片序号或原图名称'); return; }
-            const data = await BGMData.loadForTheme(currentTheme);
-            matches.forEach((file, index) => { data[cssOrderedUrls[index].originalUrl] = file; });
-            await BGMData.saveForTheme(currentTheme, data);
-            const presets = await BGMData.loadPresets(currentTheme);
-            presets.forEach(preset => { preset.isActive = false; });
-            presets.push({ id: createPresetId(), name: '本地图片替换版', data: { ...data }, isActive: true });
-            await BGMData.savePresets(currentTheme, presets);
-            await applyInjectedOverrides();
-            if (window.toastr) toastr[unmatched.length ? 'warning' : 'success'](unmatched.length ? `已导入 ${matches.size} 张，${unmatched.length} 个文件名未匹配` : '已导入并保存预设“本地图片替换版”');
-            await refreshList();
+            if (!selectedFiles.length) return;
+            const $button = $popup.find('#bgm-batch-import-images');
+            const idleHtml = $button.html();
+            $button.prop('disabled', true).html('<i class="fa-solid fa-spinner fa-spin"></i> 导入中');
+            try {
+                const files = [];
+                for (const file of selectedFiles) {
+                    if (/\.zip$/i.test(file.name) || String(file.type || '').toLowerCase().includes('zip')) files.push(...await extractBatchImagesFromZip(file));
+                    else if (String(file.type || '').startsWith('image/') || /\.(png|jpe?g|gif|webp|bmp|svg)$/i.test(file.name)) files.push(file);
+                }
+                if (!files.length) throw new Error('ZIP 中没有可导入的图片');
+                const byBaseName = new Map(cssOrderedUrls.map((item, index) => [imageBaseName(item.originalUrl), index]));
+                const matches = new Map(), unmatched = [];
+                files.forEach(file => {
+                    const baseName = imageBaseName(file.name);
+                    const numberMatch = baseName.match(/(?:^|\u2014|[-_\s])(\d+)$/);
+                    let index = numberMatch ? Number(numberMatch[1]) - 1 : -1;
+                    if (index < 0 || index >= cssOrderedUrls.length) index = byBaseName.has(baseName) ? byBaseName.get(baseName) : -1;
+                    if (index < 0 || index >= cssOrderedUrls.length) unmatched.push(file.name); else matches.set(index, file);
+                });
+                if (!matches.size) throw new Error('没有文件名能匹配当前美化的图片序号或原图名称');
+                const data = await BGMData.loadForTheme(currentTheme);
+                matches.forEach((file, index) => { data[cssOrderedUrls[index].originalUrl] = file; });
+                await BGMData.saveForTheme(currentTheme, data);
+                const presets = await BGMData.loadPresets(currentTheme);
+                presets.forEach(preset => { preset.isActive = false; });
+                presets.push({ id: createPresetId(), name: '本地图片替换版', data: { ...data }, isActive: true });
+                await BGMData.savePresets(currentTheme, presets);
+                await applyInjectedOverrides();
+                await refreshList();
+                if (window.toastr) toastr[unmatched.length ? 'warning' : 'success'](unmatched.length ? `批量导入完成：成功 ${matches.size} 张，${unmatched.length} 个文件名未匹配` : `批量导入完成：已替换 ${matches.size} 张并保存预设“本地图片替换版”`);
+            } catch (error) {
+                if (window.toastr) toastr.error(`批量导入失败：${error && error.message || error}`);
+            } finally {
+                if (!popupClosed) $button.prop('disabled', false).html(idleHtml);
+            }
         });
         $popup.on('click', '#bgm-batch-import-links', openBatchLinkModal);
 
