@@ -5,7 +5,7 @@
     const STYLE_ID = 'native-bgm-style-v7-0'; 
     const INJECT_STYLE_ID = 'native-bgm-injected-overrides';
     const MENU_BTN_ID = 'st-bgm-ext-btn-v7-0';
-    const SCRIPT_VERSION = '1.4.6';
+    const SCRIPT_VERSION = '1.4.7';
     const EXTENSION_DEFAULT_FOLDER = 'Beautify-and-Replace-Image';
     const EXTENSION_RAW_MANIFEST_URL = 'https://raw.githubusercontent.com/qishiwan16-hub/Beautify-and-Replace-Image/main/manifest.json';
     const BACKEND_BASE_URLS = [
@@ -58,6 +58,7 @@
         if (!Array.isArray(presets)) return [];
         const usedIds = new Set();
         let activeFound = false;
+        let lastUsedFound = false;
         return presets.map((rawPreset, index) => {
             const preset = rawPreset && typeof rawPreset === 'object' ? rawPreset : {};
             let id = String(preset.id || '').trim() || legacyPresetId(preset.name, index);
@@ -65,13 +66,22 @@
             usedIds.add(id);
             const isActive = !activeFound && !!preset.isActive;
             if (isActive) activeFound = true;
+            const isLastUsed = !lastUsedFound && (!!preset.isLastUsed || isActive);
+            if (isLastUsed) lastUsedFound = true;
             return {
                 ...preset,
                 id,
                 name: String(preset.name || `预设 ${index + 1}`).trim() || `预设 ${index + 1}`,
                 data: preset.data && typeof preset.data === 'object' ? preset.data : {},
-                isActive
+                isActive,
+                isLastUsed
             };
+        });
+    }
+
+    function markLastUsedPreset(presets, presetId) {
+        (presets || []).forEach(preset => {
+            preset.isLastUsed = !!presetId && preset.id === presetId;
         });
     }
 
@@ -484,6 +494,17 @@
         await BGMData.savePresets(themeName, presets);
     }
 
+    async function restoreLastUsedPreset(themeName) {
+        const presets = await BGMData.loadPresets(themeName);
+        const preset = presets.find(item => item.isLastUsed) || presets.find(item => item.isActive);
+        if (!preset || getCurrentThemeName() !== themeName) return false;
+        await BGMData.saveForTheme(themeName, { ...preset.data });
+        presets.forEach(item => { item.isActive = item.id === preset.id; });
+        markLastUsedPreset(presets, preset.id);
+        await BGMData.savePresets(themeName, presets);
+        return true;
+    }
+
     function remapUrlKeyedData(data, mappings) {
         const source = data && typeof data === 'object' ? data : {};
         const remapped = { ...source };
@@ -772,13 +793,22 @@
     }
 
     let lastThemeName = getCurrentThemeName();
+    let themePresetSyncPromise = Promise.resolve();
+    const syncThemePreset = themeName => {
+        themePresetSyncPromise = themePresetSyncPromise.then(async () => {
+            if (getCurrentThemeName() !== themeName) return;
+            await restoreLastUsedPreset(themeName);
+            if (getCurrentThemeName() === themeName) await applyInjectedOverrides();
+        }).catch(error => console.warn('[主题一键换图] 恢复美化预设失败', error));
+        return themePresetSyncPromise;
+    };
     runtimeTimers.push(setInterval(() => {
         if (isNukingDB) return;
         const currentTheme = getCurrentThemeName();
         const $ta = getCssTextarea();
         if (currentTheme !== lastThemeName) {
             lastThemeName = currentTheme;
-            applyInjectedOverrides();
+            syncThemePreset(currentTheme);
             if ($('.bgm-overlay').length > 0) $('.bgm-subtitle strong').text(currentTheme);
         }
         if ($ta.length && !$ta.data('bgm-bound')) {
@@ -1652,7 +1682,9 @@
                 const mergedDuplicates = await deduplicateImageBlobs([data, ...presets.map(preset => preset.data)]);
                 await BGMData.saveForTheme(currentTheme, data);
                 presets.forEach(preset => { preset.isActive = false; });
-                presets.push({ id: createPresetId(), name: '本地图片替换版', data: { ...data }, isActive: true });
+                const importedPreset = { id: createPresetId(), name: '本地图片替换版', data: { ...data }, isActive: true };
+                presets.push(importedPreset);
+                markLastUsedPreset(presets, importedPreset.id);
                 await BGMData.savePresets(currentTheme, presets);
                 await applyInjectedOverrides();
                 await refreshList();
@@ -1769,7 +1801,9 @@
                 let presets = await BGMData.loadPresets(currentTheme);
                 await deduplicateImageBlobs([data, ...presets.map(preset => preset.data)]);
                 presets.forEach(preset => { preset.isActive = false; });
-                presets.push({ id: createPresetId(), name: name.trim(), data, isActive: true });
+                const newPreset = { id: createPresetId(), name: name.trim(), data, isActive: true };
+                presets.push(newPreset);
+                markLastUsedPreset(presets, newPreset.id);
                 await BGMData.savePresets(currentTheme, presets);
                 await renderPresets();
                 if (window.toastr) toastr.success("预设保存成功");
@@ -1784,6 +1818,7 @@
                 if (!confirm(`恢复主题“${currentTheme}”的原始图片，并取消预设“${preset.name}”吗？`)) return;
                 await BGMData.saveForTheme(currentTheme, {});
                 presets.forEach(item => { item.isActive = false; });
+                markLastUsedPreset(presets, null);
                 await BGMData.savePresets(currentTheme, presets);
                 await applyInjectedOverrides();
                 await renderPresets();
@@ -1794,6 +1829,7 @@
             if (confirm(`应用预设 "${preset.name}"？\n当前未保存的修改将被覆盖。`)) {
                 await BGMData.saveForTheme(currentTheme, preset.data);
                 presets.forEach((item, presetIndex) => { item.isActive = presetIndex === index; });
+                markLastUsedPreset(presets, preset.id);
                 await BGMData.savePresets(currentTheme, presets);
                 await applyInjectedOverrides();
                 await renderPresets();
@@ -1814,6 +1850,7 @@
             preset.data = await BGMData.loadForTheme(currentTheme);
             await deduplicateImageBlobs(presets.map(item => item.data));
             presets.forEach((item, presetIndex) => { item.isActive = presetIndex === index; });
+            markLastUsedPreset(presets, preset.id);
             await BGMData.savePresets(currentTheme, presets);
             await renderPresets();
             if (window.toastr) toastr.success(`当前配置已保存到预设“${preset.name}”`);
