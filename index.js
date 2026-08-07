@@ -729,6 +729,13 @@
             .bgm-batch-dark { background: rgba(30,30,30,0.98); color: #eee; }
             .bgm-batch-modal-title { font-weight: 700; font-size: 1.05em; display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
             .bgm-batch-modal-hint { font-size: 0.82em; opacity: 0.72; line-height: 1.45; margin-bottom: 10px; }
+            .bgm-batch-order { display: inline-flex; margin-bottom: 10px; border: 1px solid rgba(0,0,0,0.14); border-radius: 8px; overflow: hidden; }
+            .bgm-batch-order button { min-width: 72px; padding: 7px 12px; border: 0; border-right: 1px solid rgba(0,0,0,0.12); background: rgba(255,255,255,0.58); color: inherit; cursor: pointer; }
+            .bgm-batch-order button:last-child { border-right: 0; }
+            .bgm-batch-order button.active { background: var(--SmartThemeQuoteColor); color: white; }
+            .bgm-batch-dark .bgm-batch-order { border-color: rgba(255,255,255,0.16); }
+            .bgm-batch-dark .bgm-batch-order button { background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.14); }
+            .bgm-batch-dark .bgm-batch-order button.active { background: var(--SmartThemeQuoteColor); }
             .bgm-batch-link-lines { width: 100%; min-height: 90px; resize: vertical; box-sizing: border-box; padding: 8px 10px; border-radius: 8px; border: 1px solid rgba(0,0,0,0.14); background: rgba(255,255,255,0.7); color: inherit; font: inherit; }
             .bgm-batch-dark .bgm-batch-link-lines, .bgm-batch-dark .bgm-batch-new-link { background: rgba(0,0,0,0.4); border-color: rgba(255,255,255,0.16); color: #eee; }
             .bgm-batch-table-head, .bgm-batch-table-row { display: grid; grid-template-columns: 56px minmax(0, 1fr) minmax(0, 1fr); gap: 8px; align-items: center; }
