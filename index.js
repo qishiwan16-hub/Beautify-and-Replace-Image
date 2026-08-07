@@ -5,7 +5,7 @@
     const STYLE_ID = 'native-bgm-style-v7-0'; 
     const INJECT_STYLE_ID = 'native-bgm-injected-overrides';
     const MENU_BTN_ID = 'st-bgm-ext-btn-v7-0';
-    const SCRIPT_VERSION = '1.4.3';
+    const SCRIPT_VERSION = '1.4.4';
     const EXTENSION_DEFAULT_FOLDER = 'Beautify-and-Replace-Image';
     const EXTENSION_RAW_MANIFEST_URL = 'https://raw.githubusercontent.com/qishiwan16-hub/Beautify-and-Replace-Image/main/manifest.json';
     const BACKEND_BASE_URLS = [
@@ -805,23 +805,17 @@
             .bgm-box.bgm-dark .bgm-preset-add:hover { background: rgba(0,0,0,0.3); color: #eee; }
             .bgm-box.bgm-dark .bgm-preset-item.active { border-color: #35c46a; }
 
-            .bgm-batch-modal { position: fixed; inset: 0; z-index: 100001; background: rgba(0,0,0,0.42); display: flex; align-items: center; justify-content: center; padding: 14px; box-sizing: border-box; }
-            .bgm-batch-modal-box { width: min(900px, 96vw); max-height: min(88vh, 900px); overflow: auto; background: var(--SmartThemeBlurTintColor); color: var(--SmartThemeBodyColor); border-radius: 14px; padding: 16px; box-shadow: 0 12px 42px rgba(0,0,0,0.28); }
-            .bgm-batch-dark { background: rgba(30,30,30,0.98); color: #eee; }
-            .bgm-batch-modal-title { font-weight: 700; font-size: 1.05em; display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
             .bgm-batch-modal-hint { font-size: 0.82em; opacity: 0.72; line-height: 1.45; margin-bottom: 10px; }
             .bgm-batch-order { display: inline-flex; margin-bottom: 10px; border: 1px solid rgba(0,0,0,0.14); border-radius: 8px; overflow: hidden; }
             .bgm-batch-order button { min-width: 72px; padding: 7px 12px; border: 0; border-right: 1px solid rgba(0,0,0,0.12); background: rgba(255,255,255,0.58); color: inherit; cursor: pointer; }
             .bgm-batch-order button:last-child { border-right: 0; }
             .bgm-batch-order button.active { background: var(--SmartThemeQuoteColor); color: white; }
-            .bgm-batch-dark .bgm-batch-order { border-color: rgba(255,255,255,0.16); }
-            .bgm-batch-dark .bgm-batch-order button { background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.14); }
-            .bgm-batch-dark .bgm-batch-order button.active { background: var(--SmartThemeQuoteColor); }
             .bgm-batch-link-lines { width: 100%; min-height: 90px; resize: vertical; box-sizing: border-box; padding: 8px 10px; border-radius: 8px; border: 1px solid rgba(0,0,0,0.14); background: rgba(255,255,255,0.7); color: inherit; font: inherit; }
-            .bgm-batch-dark .bgm-batch-link-lines, .bgm-batch-dark .bgm-batch-new-link { background: rgba(0,0,0,0.4); border-color: rgba(255,255,255,0.16); color: #eee; }
+            .bgm-batch-insert-row { display: flex; align-items: center; gap: 9px; margin-top: 8px; }
+            .bgm-batch-insert-links { min-height: 34px; padding: 8px 14px; border: 1px solid var(--SmartThemeQuoteColor); border-radius: 7px; background: var(--SmartThemeQuoteColor); color: white; cursor: pointer; }
+            .bgm-batch-insert-status { min-width: 0; font-size: 0.78em; opacity: 0.65; }
             .bgm-batch-table-body { display: flex; flex-direction: column; gap: 12px; margin-top: 12px; }
             .bgm-batch-table-row { display: grid; grid-template-columns: 56px minmax(0, 1fr); align-items: stretch; overflow: hidden; border: 1px solid rgba(0,0,0,0.1); border-radius: 8px; background: rgba(255,255,255,0.45); }
-            .bgm-batch-dark .bgm-batch-table-row { border-color: rgba(255,255,255,0.12); background: rgba(0,0,0,0.3); }
             .bgm-batch-index { display: flex; align-items: flex-start; justify-content: center; padding-top: 18px; border-right: 1px solid rgba(0,0,0,0.08); text-align: center; font-family: monospace; font-weight: 700; opacity: 0.72; }
             .bgm-batch-card-content { min-width: 0; display: flex; flex-direction: column; gap: 9px; padding: 14px; }
             .bgm-batch-card-head { min-width: 0; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
@@ -834,19 +828,19 @@
             .bgm-batch-preview-new { width: 100%; }
             .bgm-batch-preview { position: relative; width: 100%; aspect-ratio: 16 / 7; min-height: 130px; overflow: hidden; border: 1px solid rgba(0,0,0,0.1); border-radius: 7px; background: rgba(0,0,0,0.035); }
             .bgm-batch-preview img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; background: transparent; }
-            .bgm-batch-preview-status { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; padding: 10px; font-size: 0.76em; opacity: 0.58; text-align: center; }
+            .bgm-batch-preview-status { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; gap: 7px; padding: 10px; font-size: 0.76em; opacity: 0.58; text-align: center; }
             .bgm-batch-modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; }
             .bgm-batch-modal-actions button { padding: 8px 14px; border-radius: 8px; border: 1px solid rgba(0,0,0,0.12); background: rgba(255,255,255,0.64); color: inherit; cursor: pointer; }
             .bgm-batch-modal-actions .bgm-batch-confirm { border-color: var(--SmartThemeQuoteColor); background: var(--SmartThemeQuoteColor); color: white; }
-            .bgm-box .bgm-batch-link-page { position: static !important; inset: auto !important; transform: none !important; width: 100% !important; max-width: none !important; min-width: 0; margin: 0 !important; padding: 0 !important; border: 0 !important; background: transparent !important; box-shadow: none !important; box-sizing: border-box; }
+            .bgm-box .bgm-batch-page { position: static !important; inset: auto !important; transform: none !important; width: 100% !important; max-width: none !important; min-width: 0; margin: 0 !important; padding: 0 !important; border: 0 !important; background: transparent !important; box-shadow: none !important; box-sizing: border-box; }
             .bgm-batch-page-header { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
             .bgm-box .bgm-batch-page-back { position: static !important; transform: none !important; width: 32px !important; height: 32px !important; min-width: 32px !important; padding: 0 !important; margin: 0 !important; display: inline-flex !important; align-items: center; justify-content: center; border: 1px solid rgba(0,0,0,0.12) !important; border-radius: 8px !important; background: rgba(255,255,255,0.64) !important; color: inherit !important; cursor: pointer; box-sizing: border-box; }
             .bgm-batch-page-title { min-width: 0; font-weight: 700; font-size: 1em; display: flex; align-items: center; gap: 8px; }
-            .bgm-box .bgm-batch-link-page textarea, .bgm-box .bgm-batch-link-page input, .bgm-box .bgm-batch-link-page button, .bgm-box .bgm-batch-link-page img { position: static !important; transform: none !important; box-sizing: border-box; }
-            .bgm-box .bgm-batch-link-page .bgm-batch-link-lines { width: 100% !important; max-width: none !important; }
-            .bgm-box .bgm-batch-link-page .bgm-batch-order button, .bgm-box .bgm-batch-link-page .bgm-batch-modal-actions button { width: auto !important; }
-            .bgm-box .bgm-batch-link-page .bgm-batch-new-link, .bgm-box .bgm-batch-link-page .bgm-batch-preview-new { width: 100% !important; max-width: none !important; }
-            .bgm-box .bgm-batch-link-page .bgm-batch-preview img { position: absolute !important; inset: 0 !important; width: 100% !important; height: 100% !important; max-width: none !important; min-width: 0 !important; object-fit: contain !important; }
+            .bgm-box .bgm-batch-page textarea, .bgm-box .bgm-batch-page input, .bgm-box .bgm-batch-page button, .bgm-box .bgm-batch-page img { position: static !important; transform: none !important; box-sizing: border-box; }
+            .bgm-box .bgm-batch-page .bgm-batch-link-lines { width: 100% !important; max-width: none !important; }
+            .bgm-box .bgm-batch-page .bgm-batch-order button, .bgm-box .bgm-batch-page .bgm-batch-modal-actions button, .bgm-box .bgm-batch-page .bgm-batch-insert-links, .bgm-box .bgm-batch-page .bgm-batch-preview-trigger, .bgm-box .bgm-batch-page .bgm-download-result-copy { width: auto !important; }
+            .bgm-box .bgm-batch-page .bgm-batch-new-link, .bgm-box .bgm-batch-page .bgm-batch-preview-new { width: 100% !important; max-width: none !important; }
+            .bgm-box .bgm-batch-page .bgm-batch-preview img { position: absolute !important; inset: 0 !important; width: 100% !important; height: 100% !important; max-width: none !important; min-width: 0 !important; object-fit: contain !important; }
             .bgm-box.bgm-dark .bgm-batch-page-back, .bgm-box.bgm-dark .bgm-batch-modal-actions button { background: rgba(255,255,255,0.08) !important; border-color: rgba(255,255,255,0.16) !important; color: #eee !important; }
             .bgm-box.bgm-dark .bgm-batch-modal-actions .bgm-batch-confirm { background: var(--SmartThemeQuoteColor) !important; color: white !important; }
             .bgm-box.bgm-dark .bgm-batch-link-lines, .bgm-box.bgm-dark .bgm-batch-new-link { background: rgba(0,0,0,0.4); border-color: rgba(255,255,255,0.16); color: #eee; }
@@ -856,13 +850,14 @@
             .bgm-box.bgm-dark .bgm-batch-order { border-color: rgba(255,255,255,0.16); }
             .bgm-box.bgm-dark .bgm-batch-order button { background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.14); }
             .bgm-box.bgm-dark .bgm-batch-order button.active { background: var(--SmartThemeQuoteColor); }
-            .bgm-download-result-box { width: min(560px, 94vw); }
+            .bgm-download-result-summary { padding: 14px; border: 1px solid rgba(0,0,0,0.1); border-radius: 8px; background: rgba(255,255,255,0.45); }
             .bgm-download-result-row { display: flex; gap: 7px; margin-top: 10px; }
             .bgm-download-result-url { flex: 1; min-width: 0; box-sizing: border-box; padding: 8px 10px; border: 1px solid rgba(0,0,0,0.14); border-radius: 8px; background: rgba(255,255,255,0.72); color: inherit; }
             .bgm-download-result-copy { flex: 0 0 auto; padding: 8px 14px; border: 0; border-radius: 8px; background: var(--SmartThemeQuoteColor); color: white; cursor: pointer; }
             .bgm-download-result-note { margin-top: 8px; font-size: 0.78em; opacity: 0.66; line-height: 1.45; overflow-wrap: anywhere; }
-            .bgm-batch-dark .bgm-download-result-url { background: rgba(0,0,0,0.4); border-color: rgba(255,255,255,0.16); color: #eee; }
-            @media (max-width: 640px) { .bgm-batch-table-row { grid-template-columns: 42px minmax(0, 1fr); } .bgm-batch-card-content { padding: 11px; } .bgm-batch-card-head { align-items: flex-start; flex-wrap: wrap; } .bgm-batch-preview { min-height: 110px; } }
+            .bgm-box.bgm-dark .bgm-download-result-summary { border-color: rgba(255,255,255,0.12); background: rgba(0,0,0,0.3); }
+            .bgm-box.bgm-dark .bgm-download-result-url { background: rgba(0,0,0,0.4); border-color: rgba(255,255,255,0.16); color: #eee; }
+            @media (max-width: 640px) { .bgm-batch-table-row { grid-template-columns: 42px minmax(0, 1fr); } .bgm-batch-card-content { padding: 11px; } .bgm-batch-card-head { align-items: flex-start; flex-wrap: wrap; } .bgm-batch-preview { min-height: 110px; } .bgm-download-result-row { flex-wrap: wrap; } .bgm-download-result-url { flex-basis: 100%; } }
 
             @media (max-width: 600px) {
                 .bgm-preset-item { align-items: flex-start; flex-wrap: wrap; }
@@ -1029,6 +1024,7 @@
                         <div class="bgm-sub-panel" id="panel-presets"></div>
                         <div class="bgm-sub-panel" id="panel-storage"></div>
                         <div class="bgm-sub-panel" id="panel-batch-links"></div>
+                        <div class="bgm-sub-panel" id="panel-batch-download-result"></div>
                         <div class="bgm-list active-sub" id="panel-main">${listHTML}</div>
                     </div>
                     
@@ -1047,18 +1043,36 @@
         const panelAbortController = new AbortController();
         let popupClosed = false;
         const showBatchDownloadResult = ({ zip, filename, directUrl = '', directError = '', expiresAt = '' }) => {
-            $('.bgm-download-result-modal').remove();
             const linkContent = directUrl
                 ? `<div class="bgm-download-result-row"><input class="bgm-download-result-url" readonly value="${escapeHtml(directUrl)}"><button type="button" class="bgm-download-result-copy"><i class="fa-solid fa-copy"></i> 复制</button></div><div class="bgm-download-result-note">直链约 24 小时后失效${expiresAt ? `，有效期至 ${escapeHtml(new Date(expiresAt).toLocaleString())}` : ''}。其他浏览器需能访问当前酒馆地址。</div>`
                 : `<div class="bgm-download-result-note">未生成直链：${escapeHtml(directError || '主题后端未连接或版本过旧')}。本地 ZIP 已正常下载。</div>`;
-            const $modal = $(`<div class="bgm-batch-modal bgm-download-result-modal"><div class="bgm-batch-modal-box bgm-download-result-box ${isDarkMode ? 'bgm-batch-dark' : ''}"><div class="bgm-batch-modal-title"><i class="fa-solid fa-file-zipper"></i> 批量下载完成</div><div class="bgm-batch-modal-hint">${escapeHtml(filename)}</div>${linkContent}<div class="bgm-batch-modal-actions"><button type="button" class="bgm-batch-cancel">关闭</button><button type="button" class="bgm-batch-confirm bgm-download-again"><i class="fa-solid fa-download"></i> 再次下载</button></div></div></div>`);
-            $('body').append($modal);
-            const close = () => $modal.remove();
-            $modal.on('click', '.bgm-batch-cancel', close);
-            $modal.on('click', event => { if ($(event.target).is('.bgm-batch-modal')) close(); });
-            $modal.on('click', '.bgm-download-again', () => downloadBatchBlob(zip, filename));
-            $modal.on('click', '.bgm-download-result-copy', async function() {
-                const $input = $modal.find('.bgm-download-result-url');
+            const $panel = $popup.find('#panel-batch-download-result');
+            $panel.off('.bgmDownloadResult').html(`
+                <div class="bgm-batch-page bgm-download-result-page">
+                    <div class="bgm-batch-page-header">
+                        <button type="button" class="bgm-batch-page-back" title="返回图片列表" aria-label="返回图片列表"><i class="fa-solid fa-arrow-left"></i></button>
+                        <div class="bgm-batch-page-title"><i class="fa-solid fa-file-zipper"></i> 批量下载完成</div>
+                    </div>
+                    <div class="bgm-download-result-summary">
+                        <div class="bgm-batch-modal-hint">${escapeHtml(filename)}</div>
+                        ${linkContent}
+                    </div>
+                    <div class="bgm-batch-modal-actions"><button type="button" class="bgm-batch-cancel">返回列表</button><button type="button" class="bgm-batch-confirm bgm-download-again"><i class="fa-solid fa-download"></i> 再次下载</button></div>
+                </div>`);
+            $popup.find('.bgm-sub-panel').removeClass('active');
+            $popup.find('.bgm-tool-btn').removeClass('active');
+            $popup.find('#panel-main').hide();
+            $panel.addClass('active');
+            $popup.find('.bgm-content').scrollTop(0);
+            const returnToMain = () => {
+                $panel.removeClass('active').empty().off('.bgmDownloadResult');
+                $popup.find('#panel-main').show();
+                $popup.find('.bgm-content').scrollTop(0);
+            };
+            $panel.on('click.bgmDownloadResult', '.bgm-batch-page-back, .bgm-batch-cancel', returnToMain);
+            $panel.on('click.bgmDownloadResult', '.bgm-download-again', () => downloadBatchBlob(zip, filename));
+            $panel.on('click.bgmDownloadResult', '.bgm-download-result-copy', async function() {
+                const $input = $panel.find('.bgm-download-result-url');
                 const copied = await copyTextValue(directUrl, $input[0]);
                 if (window.toastr) toastr[copied ? 'success' : 'error'](copied ? '直链已复制' : '复制失败，请手动选择链接');
             });
@@ -1067,7 +1081,6 @@
         const closePopup = () => {
             popupClosed = true;
             panelAbortController.abort();
-            $('.bgm-batch-modal').remove();
             $popup.fadeOut(200, () => $popup.remove());
         };
         $popup.find('.bgm-close').on('click', closePopup);
@@ -1109,6 +1122,7 @@
 
         const openBatchLinkPanel = () => {
             let linkOrder = 'forward';
+            let linksInserted = false;
             const orderedItems = () => linkOrder === 'reverse' ? cssOrderedUrls.slice().reverse() : cssOrderedUrls.slice();
             const buildRows = (lines = []) => orderedItems().map((item, rowIndex) => {
                 const imageIndex = cssOrderedUrls.findIndex(candidate => candidate.originalUrl === item.originalUrl);
@@ -1124,17 +1138,17 @@
                             <button type="button" class="bgm-batch-preview-trigger bgm-batch-preview-original">预览原图</button>
                         </div>
                         <div class="bgm-batch-card-url" title="${escapeHtml(item.originalUrl)}">${escapeHtml(item.originalUrl)}</div>
-                        <div class="bgm-batch-preview"><img class="bgm-batch-original-preview" src="${escapeHtml(item.originalUrl)}" loading="lazy" alt="原图预览"><div class="bgm-batch-preview-status">加载预览中...</div></div>
+                        <div class="bgm-batch-preview"><img class="bgm-batch-original-preview" src="${escapeHtml(item.originalUrl)}" loading="lazy" alt="原图预览"><div class="bgm-batch-preview-status"><i class="fa-solid fa-spinner fa-spin"></i><span>加载预览中...</span></div></div>
                         <label class="bgm-batch-new-label">新链接</label>
                         <input class="bgm-batch-new-link" type="text" value="${escapeHtml(newUrl)}" placeholder="填写新的图片链接（https://...），或填写“空”跳过">
                         <button type="button" class="bgm-batch-preview-trigger bgm-batch-preview-new">预览新图</button>
-                        <div class="bgm-batch-preview"><img class="bgm-batch-new-preview" ${previewUrl ? `src="${escapeHtml(previewUrl)}"` : ''} loading="lazy" alt="新图预览"><div class="bgm-batch-preview-status">${previewUrl ? '加载预览中...' : newUrl === '空' ? '该序号保持原图' : '填写链接后显示预览'}</div></div>
+                        <div class="bgm-batch-preview"><img class="bgm-batch-new-preview" ${previewUrl ? `src="${escapeHtml(previewUrl)}"` : ''} loading="lazy" alt="新图预览"><div class="bgm-batch-preview-status">${previewUrl ? '<i class="fa-solid fa-spinner fa-spin"></i><span>加载预览中...</span>' : newUrl === '空' ? '该序号保持原图' : '填写链接后显示预览'}</div></div>
                     </div>
                 </div>`;
             }).join('');
             const $panel = $popup.find('#panel-batch-links');
             $panel.off('.bgmBatchLinks').html(`
-                <div class="bgm-batch-link-page">
+                <div class="bgm-batch-page bgm-batch-link-page">
                     <div class="bgm-batch-page-header">
                         <button type="button" class="bgm-batch-page-back" title="返回图片列表" aria-label="返回图片列表"><i class="fa-solid fa-arrow-left"></i></button>
                         <div class="bgm-batch-page-title"><i class="fa-solid fa-link"></i> 批量导入链接</div>
@@ -1142,6 +1156,7 @@
                     <div class="bgm-batch-modal-hint">每行对应一个图片序号。输入“空”会保留该序号的原链接；每项会显示原图和新图的大图预览。</div>
                     <div class="bgm-batch-order" role="group" aria-label="替换顺序"><button type="button" class="active" data-order="forward">正序</button><button type="button" data-order="reverse">倒序</button></div>
                     <textarea class="bgm-batch-link-lines" placeholder="链接1&#10;空&#10;链接3"></textarea>
+                    <div class="bgm-batch-insert-row"><button type="button" class="bgm-batch-insert-links"><i class="fa-solid fa-arrow-down"></i> 插入替换</button><span class="bgm-batch-insert-status" role="status" aria-live="polite"></span></div>
                     <div class="bgm-batch-table-body">${buildRows()}</div>
                     <div class="bgm-batch-modal-actions"><button type="button" class="bgm-batch-cancel">取消</button><button type="button" class="bgm-batch-confirm">确认替换</button></div>
                 </div>`);
@@ -1167,10 +1182,10 @@
                 }
                 const finish = loaded => {
                     $image.toggle(loaded);
-                    $status.text(loaded ? '' : '图片预览加载失败').toggle(!loaded);
+                    $status.html(loaded ? '' : '<i class="fa-solid fa-circle-exclamation"></i><span>图片预览加载失败</span>').toggle(!loaded);
                 };
                 $image.show();
-                $status.text('加载预览中...').show();
+                $status.html('<i class="fa-solid fa-spinner fa-spin"></i><span>加载预览中...</span>').show();
                 $image.one('load.bgmPreview', () => finish(true));
                 $image.one('error.bgmPreview', () => finish(false));
                 if (image.complete) queueMicrotask(() => finish(image.naturalWidth > 0));
@@ -1189,6 +1204,7 @@
                 bindPreviewState($preview);
             };
             const currentLines = () => String($panel.find('.bgm-batch-link-lines').val() || '').replace(/\r/g, '').split('\n');
+            const yieldForPaint = () => new Promise(resolve => requestAnimationFrame(() => setTimeout(resolve, 0)));
             const renderRows = () => {
                 $panel.find('.bgm-batch-table-body').html(buildRows(currentLines()));
                 bindPreviewStates();
@@ -1197,12 +1213,24 @@
             $panel.on('click.bgmBatchLinks', '.bgm-batch-order button', function() {
                 linkOrder = String($(this).data('order')) === 'reverse' ? 'reverse' : 'forward';
                 $(this).addClass('active').siblings().removeClass('active');
-                renderRows();
+                if (linksInserted) renderRows();
             });
-            $panel.on('input.bgmBatchLinks', '.bgm-batch-link-lines', function() {
+            $panel.on('click.bgmBatchLinks', '.bgm-batch-insert-links', async function() {
+                const inserted = currentLines().filter(line => String(line || '').trim()).length;
+                if (!inserted) { if (window.toastr) toastr.warning('请先输入要替换的链接'); return; }
+                const $button = $(this);
+                const idleHtml = $button.html();
+                const $status = $panel.find('.bgm-batch-insert-status');
+                $button.prop('disabled', true).html('<i class="fa-solid fa-spinner fa-spin"></i> 插入中...');
+                $status.html('<i class="fa-solid fa-spinner fa-spin"></i> 正在生成逐项预览');
+                await yieldForPaint();
+                linksInserted = true;
                 renderRows();
+                $status.text(`已插入 ${inserted} 行`);
+                $button.prop('disabled', false).html(idleHtml);
             });
             $panel.on('input.bgmBatchLinks', '.bgm-batch-new-link', function() {
+                linksInserted = true;
                 const $input = $(this);
                 const rowIndex = $panel.find('.bgm-batch-table-row').index($input.closest('.bgm-batch-table-row'));
                 const lines = currentLines();
@@ -1225,6 +1253,10 @@
             $panel.on('click.bgmBatchLinks', '.bgm-batch-confirm', async function() {
                 const $textarea = getCssTextarea();
                 if (!$textarea.length) { if (window.toastr) toastr.error('未找到酒馆主题 CSS 编辑框'); return; }
+                const $button = $(this);
+                const idleHtml = $button.html();
+                $button.prop('disabled', true).html('<i class="fa-solid fa-spinner fa-spin"></i> 替换中...');
+                await yieldForPaint();
                 let css = String($textarea.val() || ''), replaced = 0;
                 $panel.find('.bgm-batch-table-row').each(function() {
                     const imageIndex = Number($(this).data('image-index'));
@@ -1234,8 +1266,11 @@
                     if (!oldUrl || !newUrl || newUrl === '空' || newUrl === oldUrl) return;
                     css = css.split(oldUrl).join(newUrl); replaced += 1;
                 });
-                if (!replaced) { if (window.toastr) toastr.warning('没有需要替换的链接'); return; }
-                $(this).prop('disabled', true).text('替换中...');
+                if (!replaced) {
+                    $button.prop('disabled', false).html(idleHtml);
+                    if (window.toastr) toastr.warning('没有需要替换的链接');
+                    return;
+                }
                 $textarea.val(css).trigger('input');
                 await clearActivePreset(currentTheme);
                 returnToMain();
@@ -1277,7 +1312,7 @@
                 } catch (error) {
                     directError = String(error && error.message || error);
                 }
-                showBatchDownloadResult({ zip, filename, directUrl, directError, expiresAt });
+                if (!popupClosed) showBatchDownloadResult({ zip, filename, directUrl, directError, expiresAt });
                 if (window.toastr) {
                     const level = failed.length || !directUrl ? 'warning' : 'success';
                     const summary = failed.length
@@ -1885,7 +1920,7 @@
     window.__briHotCleanup = () => {
         runtimeTimers.splice(0).forEach(timer => { clearTimeout(timer); clearInterval(timer); });
         $('#extensionsMenu').find(`#${MENU_BTN_ID}`).remove();
-        $('.bgm-overlay, .bgm-batch-modal').remove();
+        $('.bgm-overlay').remove();
         $(`#${STYLE_ID}, #${INJECT_STYLE_ID}`).remove();
         const $ta = getCssTextarea();
         $ta.off('input', applyInjectedOverrides).removeData('bgm-bound');
