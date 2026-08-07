@@ -5,7 +5,7 @@
     const STYLE_ID = 'native-bgm-style-v7-0'; 
     const INJECT_STYLE_ID = 'native-bgm-injected-overrides';
     const MENU_BTN_ID = 'st-bgm-ext-btn-v7-0';
-    const SCRIPT_VERSION = '1.3.3';
+    const SCRIPT_VERSION = '1.4.0';
     const EXTENSION_DEFAULT_FOLDER = 'Beautify-and-Replace-Image';
     const EXTENSION_RAW_MANIFEST_URL = 'https://raw.githubusercontent.com/qishiwan16-hub/Beautify-and-Replace-Image/main/manifest.json';
     const BACKEND_BASE_URLS = [
@@ -422,6 +422,74 @@
         await BGMData.savePresets(themeName, presets);
     }
 
+    const BATCH_NAME_SEPARATOR = '\u2014';
+
+    function writeZipU16(bytes, value) { bytes.push(value & 0xff, (value >>> 8) & 0xff); }
+    function writeZipU32(bytes, value) { bytes.push(value & 0xff, (value >>> 8) & 0xff, (value >>> 16) & 0xff, (value >>> 24) & 0xff); }
+    function zipCrc32(bytes) {
+        let crc = 0xffffffff;
+        for (const value of bytes) {
+            crc ^= value;
+            for (let bit = 0; bit < 8; bit++) crc = (crc & 1) ? (0xedb88320 ^ (crc >>> 1)) : (crc >>> 1);
+        }
+        return (crc ^ 0xffffffff) >>> 0;
+    }
+    async function createBatchZip(entries) {
+        const encoder = new TextEncoder();
+        const local = [], central = [];
+        let offset = 0;
+        for (const entry of entries) {
+            const name = encoder.encode(String(entry.name));
+            const data = entry.data instanceof Uint8Array ? entry.data : new Uint8Array(await entry.data.arrayBuffer());
+            const crc = zipCrc32(data);
+            const localHeader = [];
+            writeZipU32(localHeader, 0x04034b50); writeZipU16(localHeader, 20); writeZipU16(localHeader, 0x0800); writeZipU16(localHeader, 0); writeZipU16(localHeader, 0); writeZipU16(localHeader, 0);
+            writeZipU32(localHeader, crc); writeZipU32(localHeader, data.length); writeZipU32(localHeader, data.length); writeZipU16(localHeader, name.length); writeZipU16(localHeader, 0);
+            local.push(new Uint8Array(localHeader), name, data);
+            const centralHeader = [];
+            writeZipU32(centralHeader, 0x02014b50); writeZipU16(centralHeader, 20); writeZipU16(centralHeader, 20); writeZipU16(centralHeader, 0x0800); writeZipU16(centralHeader, 0); writeZipU16(centralHeader, 0); writeZipU16(centralHeader, 0);
+            writeZipU32(centralHeader, crc); writeZipU32(centralHeader, data.length); writeZipU32(centralHeader, data.length); writeZipU16(centralHeader, name.length); writeZipU16(centralHeader, 0); writeZipU16(centralHeader, 0); writeZipU16(centralHeader, 0); writeZipU16(centralHeader, 0); writeZipU32(centralHeader, 0); writeZipU32(centralHeader, offset);
+            central.push(new Uint8Array(centralHeader), name);
+            offset += 30 + name.length + data.length;
+        }
+        const centralSize = central.reduce((sum, part) => sum + part.length, 0);
+        const end = [];
+        writeZipU32(end, 0x06054b50); writeZipU16(end, 0); writeZipU16(end, 0); writeZipU16(end, entries.length); writeZipU16(end, entries.length); writeZipU32(end, centralSize); writeZipU32(end, offset); writeZipU16(end, 0);
+        return new Blob([...local, ...central, new Uint8Array(end)], { type: 'application/zip' });
+    }
+    function batchTimestamp() {
+        const date = new Date();
+        const pad = value => String(value).padStart(2, '0');
+        return `${date.getFullYear()}${pad(date.getMonth() + 1)}${pad(date.getDate())}${pad(date.getHours())}${pad(date.getMinutes())}${pad(date.getSeconds())}`;
+    }
+    function imageExtensionFromBlob(blob, fallback = 'png') {
+        const mime = String(blob?.type || '').toLowerCase();
+        if (mime.includes('png')) return 'png';
+        if (mime.includes('jpeg') || mime.includes('jpg')) return 'jpg';
+        if (mime.includes('gif')) return 'gif';
+        if (mime.includes('webp')) return 'webp';
+        if (mime.includes('bmp')) return 'bmp';
+        if (mime.includes('svg')) return 'svg';
+        const match = String(fallback).match(/\.([a-z0-9]+)(?:\?|$)/i);
+        return match ? match[1].toLowerCase() : 'png';
+    }
+    function imageBaseName(value) {
+        try { return decodeURIComponent(String(value || '').split(/[?#]/)[0].split('/').pop() || '').replace(/\.[^.]+$/, '').trim().toLowerCase(); }
+        catch (error) { return String(value || '').split(/[?#]/)[0].split('/').pop().replace(/\.[^.]+$/, '').trim().toLowerCase(); }
+    }
+    function getBatchImageName(theme, index, extension) {
+        return `${sanitizeFileName(theme)}${BATCH_NAME_SEPARATOR}${String(index + 1).padStart(2, '0')}.${extension}`;
+    }
+    function sanitizeFileName(value) {
+        return String(value || '美化').replace(/[\\/:*?"<>|]+/g, '_').trim().slice(0, 100) || '美化';
+    }
+    function downloadBatchBlob(blob, filename) {
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url; link.download = filename; document.body.appendChild(link); link.click(); link.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+    }
+
     function storageLabel() {
         if (serverStorage.mode === 'server') return '存储：酒馆后端';
         if (serverStorage.mode === 'local') return '存储：浏览器 IndexedDB';
@@ -656,6 +724,29 @@
             .bgm-box.bgm-dark .bgm-preset-add:hover { background: rgba(0,0,0,0.3); color: #eee; }
             .bgm-box.bgm-dark .bgm-preset-item.active { border-color: #35c46a; }
 
+            .bgm-batch-modal { position: fixed; inset: 0; z-index: 100001; background: rgba(0,0,0,0.42); display: flex; align-items: center; justify-content: center; padding: 14px; box-sizing: border-box; }
+            .bgm-batch-modal-box { width: min(900px, 96vw); max-height: min(88vh, 900px); overflow: auto; background: var(--SmartThemeBlurTintColor); color: var(--SmartThemeBodyColor); border-radius: 14px; padding: 16px; box-shadow: 0 12px 42px rgba(0,0,0,0.28); }
+            .bgm-batch-dark { background: rgba(30,30,30,0.98); color: #eee; }
+            .bgm-batch-modal-title { font-weight: 700; font-size: 1.05em; display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+            .bgm-batch-modal-hint { font-size: 0.82em; opacity: 0.72; line-height: 1.45; margin-bottom: 10px; }
+            .bgm-batch-link-lines { width: 100%; min-height: 90px; resize: vertical; box-sizing: border-box; padding: 8px 10px; border-radius: 8px; border: 1px solid rgba(0,0,0,0.14); background: rgba(255,255,255,0.7); color: inherit; font: inherit; }
+            .bgm-batch-dark .bgm-batch-link-lines, .bgm-batch-dark .bgm-batch-new-link { background: rgba(0,0,0,0.4); border-color: rgba(255,255,255,0.16); color: #eee; }
+            .bgm-batch-table-head, .bgm-batch-table-row { display: grid; grid-template-columns: 56px minmax(0, 1fr) minmax(0, 1fr); gap: 8px; align-items: center; }
+            .bgm-batch-table-head { margin-top: 12px; padding: 7px 8px; font-size: 0.78em; opacity: 0.65; }
+            .bgm-batch-table-body { display: flex; flex-direction: column; gap: 6px; }
+            .bgm-batch-table-row { padding: 7px 8px; border: 1px solid rgba(0,0,0,0.1); border-radius: 9px; background: rgba(255,255,255,0.45); }
+            .bgm-batch-dark .bgm-batch-table-row { border-color: rgba(255,255,255,0.12); background: rgba(0,0,0,0.3); }
+            .bgm-batch-index { text-align: center; font-family: monospace; opacity: 0.72; }
+            .bgm-batch-link-cell { min-width: 0; display: flex; align-items: center; gap: 7px; }
+            .bgm-batch-link-cell img { width: 48px; height: 48px; flex: 0 0 48px; object-fit: contain; border-radius: 6px; background: rgba(0,0,0,0.06); }
+            .bgm-batch-link-cell img.empty { visibility: hidden; }
+            .bgm-batch-link-cell > div { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.76em; opacity: 0.72; }
+            .bgm-batch-new-link { min-width: 0; flex: 1; box-sizing: border-box; padding: 7px 8px; border-radius: 7px; border: 1px solid rgba(0,0,0,0.12); background: rgba(255,255,255,0.72); color: inherit; }
+            .bgm-batch-modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; }
+            .bgm-batch-modal-actions button { padding: 8px 14px; border-radius: 8px; border: 1px solid rgba(0,0,0,0.12); background: rgba(255,255,255,0.64); color: inherit; cursor: pointer; }
+            .bgm-batch-modal-actions .bgm-batch-confirm { border-color: var(--SmartThemeQuoteColor); background: var(--SmartThemeQuoteColor); color: white; }
+            @media (max-width: 640px) { .bgm-batch-table-head, .bgm-batch-table-row { grid-template-columns: 34px minmax(0, 1fr) minmax(0, 1fr); gap: 4px; } .bgm-batch-link-cell { flex-direction: column; align-items: stretch; } .bgm-batch-link-cell img { width: 100%; height: 54px; flex-basis: 54px; } .bgm-batch-link-cell > div { display: none; } }
+
             @media (max-width: 600px) {
                 .bgm-preset-item { align-items: flex-start; flex-wrap: wrap; }
                 .bgm-preset-name { min-width: calc(100% - 24px); }
@@ -671,6 +762,7 @@
             
             /* 确保横幅不受列表order影响始终在最上方 */
             .bgm-dev-banner { justify-content: space-between; align-items: center; padding: 12px 15px; background: rgba(0,0,0,0.03); border-radius: 12px; border: 1px dashed var(--SmartThemeQuoteColor); font-size: 0.85em; margin-bottom: 5px; flex-shrink: 0; order: -2; }
+            .bgm-dev-banner > div { width: 100%; }
             .bgm-box.bgm-dark .bgm-dev-banner { background: rgba(0,0,0,0.3); border-color: rgba(255,255,255,0.2); }
             
             /* 创作模式新的一整行按钮组，跨越预览图和信息的整个宽度 */
@@ -679,10 +771,14 @@
             
             /* 换链接和下载按钮的悬浮样式：日间背景保持白，边框/文字变色；夜间保持和换图一致 */
             .bgm-btn-dev-action-row:hover { background: white; color: var(--SmartThemeQuoteColor); border-color: var(--SmartThemeQuoteColor); }
+            .bgm-batch-actions { display: flex; gap: 8px; width: 100%; margin-top: 8px; order: 3; }
+            .bgm-batch-actions .bgm-btn-dev-action-row { flex: 1; min-width: 0; }
+            @media (max-width: 600px) { .bgm-batch-actions { flex-wrap: wrap; } .bgm-batch-actions .bgm-btn-dev-action-row { flex-basis: 100%; } }
             
             /* 夜间模式 */
             .bgm-box.bgm-dark .bgm-btn-dev-action-row { background: rgba(255,255,255,0.1); color: #ccc; border-color: transparent; }
             .bgm-box.bgm-dark .bgm-btn-dev-action-row:hover { background: rgba(255,255,255,0.2); color: #fff; border-color: transparent; transform: translateY(-1px); }
+            .bgm-box.bgm-dark .bgm-batch-actions .bgm-btn-dev-action-row { background: rgba(255,255,255,0.1); color: #ccc; border-color: transparent; }
         </style>
     `);
 
@@ -692,6 +788,7 @@
         const currentTheme = getCurrentThemeName();
         const overrides = await BGMData.loadForTheme(currentTheme);
         const parsedUrls = extractCSSUrls();
+        const cssOrderedUrls = parsedUrls.slice();
 
         parsedUrls.sort((a, b) => {
             const hasA = overrides[a.originalUrl] !== undefined;
@@ -713,6 +810,11 @@
             let devBannerHTML = `
                 <div class="bgm-dev-only bgm-dev-banner">
                     <div style="display:flex; flex-direction:column; gap:4px;">
+                        <div class="bgm-batch-actions">
+                            <button class="bgm-btn-dev-action-row" id="bgm-batch-download"><i class="fa-solid fa-file-zipper"></i> 鎵归噺涓嬭浇</button>
+                            <button class="bgm-btn-dev-action-row" id="bgm-batch-import-images"><i class="fa-solid fa-file-arrow-up"></i> 鎵归噺瀵煎叆</button>
+                            <button class="bgm-btn-dev-action-row" id="bgm-batch-import-links"><i class="fa-solid fa-link"></i> 閾炬帴瀵煎叆</button>
+                        </div>
                         <span style="font-size:1.1em; color:var(--SmartThemeQuoteColor);"><i class="fa-solid fa-screwdriver-wrench"></i> <strong>创作模式</strong></span>
                         <span style="opacity:0.7;">可以直接替换 CSS 源码中的链接，或下载单个原图素材。<br>注意：替换链接后不会自动保存主题，请自行去主题页面保存。</span>
                     </div>
@@ -813,14 +915,21 @@
                     </div>
                     
                     <input type="file" id="bgm-file-input" accept="image/*" style="display:none;">
+                    <input type="file" id="bgm-batch-image-input" accept="image/*" multiple style="display:none;">
                 </div>
             </div>
         `;
 
         const $popup = $(popupHTML);
         $('body').append($popup);
+        $popup.find('#bgm-batch-download').html('<i class="fa-solid fa-file-zipper"></i> &#25209;&#37327;&#19979;&#36733;');
+        $popup.find('#bgm-batch-import-images').html('<i class="fa-solid fa-file-arrow-up"></i> &#25209;&#37327;&#23548;&#20837;');
+        $popup.find('#bgm-batch-import-links').html('<i class="fa-solid fa-link"></i> &#38142;&#25509;&#23548;&#20837;');
 
-        const closePopup = () => $popup.fadeOut(200, () => $popup.remove());
+        const closePopup = () => {
+            $('.bgm-batch-modal').remove();
+            $popup.fadeOut(200, () => $popup.remove());
+        };
         $popup.find('.bgm-close').on('click', closePopup);
         
         // =================== 日夜切换与开发模式切换 ===================
@@ -857,6 +966,138 @@
             $('.bgm-overlay').remove(); 
             await showBgmPopup();       
         };
+
+        const closeBatchModal = $modal => $modal.remove();
+        const openBatchLinkModal = () => {
+            $('.bgm-batch-link-modal').remove();
+            let linkOrder = 'forward';
+            const orderedItems = () => linkOrder === 'reverse' ? cssOrderedUrls.slice().reverse() : cssOrderedUrls.slice();
+            const buildRows = (lines = []) => orderedItems().map((item, rowIndex) => {
+                const imageIndex = cssOrderedUrls.findIndex(candidate => candidate.originalUrl === item.originalUrl);
+                const newUrl = String(lines[rowIndex] || '').trim();
+                const previewUrl = newUrl && newUrl !== '空' ? newUrl : '';
+                return `<div class="bgm-batch-table-row" data-image-index="${imageIndex}">
+                    <div class="bgm-batch-index">${String(imageIndex + 1).padStart(2, '0')}</div>
+                    <div class="bgm-batch-link-cell"><img src="${escapeHtml(item.originalUrl)}" alt=""><div title="${escapeHtml(item.originalUrl)}">${escapeHtml(item.originalUrl)}</div></div>
+                    <div class="bgm-batch-link-cell"><img class="bgm-batch-new-preview ${previewUrl ? '' : 'empty'}" ${previewUrl ? `src="${escapeHtml(previewUrl)}"` : ''} alt=""><input class="bgm-batch-new-link" type="text" value="${escapeHtml(newUrl)}" placeholder="新链接，或填写“空”跳过"></div>
+                </div>`;
+            }).join('');
+            const $modal = $(`
+                <div class="bgm-batch-modal bgm-batch-link-modal">
+                    <div class="bgm-batch-modal-box ${isDarkMode ? 'bgm-batch-dark' : ''}">
+                        <div class="bgm-batch-modal-title"><i class="fa-solid fa-link"></i> 批量导入链接</div>
+                        <div class="bgm-batch-modal-hint">每行对应一个图片序号。输入“空”会保留该序号的原链接；编辑表格中的链接时，缩略图会实时更新。</div>
+                        <div class="bgm-batch-order" role="group" aria-label="替换顺序"><button type="button" class="active" data-order="forward">正序</button><button type="button" data-order="reverse">倒序</button></div>
+                        <textarea class="bgm-batch-link-lines" placeholder="链接1&#10;空&#10;链接3"></textarea>
+                        <div class="bgm-batch-table-head"><span>序号</span><span>原链接及缩略图</span><span>新链接及缩略图</span></div>
+                        <div class="bgm-batch-table-body">${buildRows()}</div>
+                        <div class="bgm-batch-modal-actions"><button type="button" class="bgm-batch-cancel">取消</button><button type="button" class="bgm-batch-confirm">确认替换</button></div>
+                    </div>
+                </div>`);
+            $('body').append($modal);
+            const updatePreview = $input => {
+                const value = String($input.val() || '').trim();
+                const $preview = $input.siblings('.bgm-batch-new-preview');
+                if (!value || value === '空') $preview.removeAttr('src').addClass('empty');
+                else $preview.attr('src', value).removeClass('empty');
+            };
+            const currentLines = () => String($modal.find('.bgm-batch-link-lines').val() || '').replace(/\r/g, '').split('\n');
+            const renderRows = () => $modal.find('.bgm-batch-table-body').html(buildRows(currentLines()));
+            $modal.on('click', '.bgm-batch-order button', function() {
+                linkOrder = String($(this).data('order')) === 'reverse' ? 'reverse' : 'forward';
+                $(this).addClass('active').siblings().removeClass('active');
+                renderRows();
+            });
+            $modal.on('input', '.bgm-batch-link-lines', function() {
+                renderRows();
+            });
+            $modal.on('input', '.bgm-batch-new-link', function() {
+                const $input = $(this);
+                const rowIndex = $modal.find('.bgm-batch-table-row').index($input.closest('.bgm-batch-table-row'));
+                const lines = currentLines();
+                while (lines.length <= rowIndex) lines.push('');
+                lines[rowIndex] = String($input.val() || '').trim();
+                $modal.find('.bgm-batch-link-lines').val(lines.join('\n'));
+                updatePreview($input);
+            });
+            $modal.on('click', '.bgm-batch-cancel', () => closeBatchModal($modal));
+            $modal.on('click', event => { if ($(event.target).is('.bgm-batch-modal')) closeBatchModal($modal); });
+            $modal.on('click', '.bgm-batch-confirm', async function() {
+                const $textarea = getCssTextarea();
+                if (!$textarea.length) { if (window.toastr) toastr.error('未找到酒馆主题 CSS 编辑框'); return; }
+                let css = String($textarea.val() || ''), replaced = 0;
+                $modal.find('.bgm-batch-table-row').each(function() {
+                    const imageIndex = Number($(this).data('image-index'));
+                    const $input = $(this).find('.bgm-batch-new-link');
+                    const newUrl = String($input.val() || '').trim();
+                    const oldUrl = cssOrderedUrls[imageIndex]?.originalUrl;
+                    if (!oldUrl || !newUrl || newUrl === '空' || newUrl === oldUrl) return;
+                    css = css.split(oldUrl).join(newUrl); replaced += 1;
+                });
+                if (!replaced) { if (window.toastr) toastr.warning('没有需要替换的链接'); return; }
+                $(this).prop('disabled', true).text('替换中...');
+                $textarea.val(css).trigger('input');
+                await clearActivePreset(currentTheme);
+                closeBatchModal($modal);
+                if (window.toastr) toastr.success(`已替换 ${replaced} 个链接，请在酒馆主题界面自行保存`);
+                await refreshList();
+            });
+        };
+
+        $popup.on('click', '#bgm-batch-download', async function() {
+            if (!cssOrderedUrls.length) return;
+            const $button = $(this), oldHtml = $button.html();
+            $button.prop('disabled', true).html('<i class="fa-solid fa-spinner fa-spin"></i> 下载中');
+            const entries = [], failed = [];
+            for (let index = 0; index < cssOrderedUrls.length; index++) {
+                const url = cssOrderedUrls[index].originalUrl;
+                try {
+                    const response = await fetch(url, { cache: 'no-store' });
+                    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                    const blob = await response.blob();
+                    if (!blob.size) throw new Error('Empty image');
+                    entries.push({ name: getBatchImageName(currentTheme, index, imageExtensionFromBlob(blob, url)), data: blob });
+                } catch (error) { failed.push({ index: index + 1, url, error: String(error?.message || error) }); }
+            }
+            if (failed.length) {
+                const text = failed.map(item => `${String(item.index).padStart(2, '0')}\t${item.url}\t${item.error}`).join('\n');
+                entries.push({ name: '下载失败序号.txt', data: new TextEncoder().encode(`失败序号\t原链接\t原因\n${text}\n`) });
+            }
+            if (entries.length) {
+                const zip = await createBatchZip(entries);
+                downloadBatchBlob(zip, `${sanitizeFileName(currentTheme)}-${batchTimestamp()}.zip`);
+                if (window.toastr) toastr[failed.length ? 'warning' : 'success'](failed.length ? `下载完成，${failed.length} 张失败，详情见 TXT` : `已下载 ${cssOrderedUrls.length} 张图片`);
+            }
+            $button.prop('disabled', false).html(oldHtml);
+        });
+
+        $popup.on('click', '#bgm-batch-import-images', () => $popup.find('#bgm-batch-image-input').click());
+        $popup.find('#bgm-batch-image-input').on('change', async function(event) {
+            const files = Array.from(event.target.files || []).filter(file => String(file.type || '').startsWith('image/') || /\.(png|jpe?g|gif|webp|bmp|svg)$/i.test(file.name));
+            $(this).val('');
+            if (!files.length) return;
+            const byBaseName = new Map(cssOrderedUrls.map((item, index) => [imageBaseName(item.originalUrl), index]));
+            const matches = new Map(), unmatched = [];
+            files.forEach(file => {
+                const baseName = imageBaseName(file.name);
+                const numberMatch = baseName.match(/(?:^|\u2014|[-_\s])(\d+)$/);
+                let index = numberMatch ? Number(numberMatch[1]) - 1 : -1;
+                if (index < 0 || index >= cssOrderedUrls.length) index = byBaseName.has(baseName) ? byBaseName.get(baseName) : -1;
+                if (index < 0 || index >= cssOrderedUrls.length) unmatched.push(file.name); else matches.set(index, file);
+            });
+            if (!matches.size) { if (window.toastr) toastr.error('没有文件名能匹配当前美化的图片序号或原图名称'); return; }
+            const data = await BGMData.loadForTheme(currentTheme);
+            matches.forEach((file, index) => { data[cssOrderedUrls[index].originalUrl] = file; });
+            await BGMData.saveForTheme(currentTheme, data);
+            const presets = await BGMData.loadPresets(currentTheme);
+            presets.forEach(preset => { preset.isActive = false; });
+            presets.push({ id: createPresetId(), name: '本地图片替换版', data: { ...data }, isActive: true });
+            await BGMData.savePresets(currentTheme, presets);
+            await applyInjectedOverrides();
+            if (window.toastr) toastr[unmatched.length ? 'warning' : 'success'](unmatched.length ? `已导入 ${matches.size} 张，${unmatched.length} 个文件名未匹配` : '已导入并保存预设“本地图片替换版”');
+            await refreshList();
+        });
+        $popup.on('click', '#bgm-batch-import-links', openBatchLinkModal);
 
         // =================== 创作模式专属事件 ===================
         // 1. 替换 CSS 原链接
@@ -1396,7 +1637,7 @@
     window.__briHotCleanup = () => {
         runtimeTimers.splice(0).forEach(timer => { clearTimeout(timer); clearInterval(timer); });
         $('#extensionsMenu').find(`#${MENU_BTN_ID}`).remove();
-        $('.bgm-overlay').remove();
+        $('.bgm-overlay, .bgm-batch-modal').remove();
         $(`#${STYLE_ID}, #${INJECT_STYLE_ID}`).remove();
         const $ta = getCssTextarea();
         $ta.off('input', applyInjectedOverrides).removeData('bgm-bound');
