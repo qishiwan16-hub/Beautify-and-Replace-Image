@@ -5,7 +5,7 @@
     const STYLE_ID = 'native-bgm-style-v7-0'; 
     const INJECT_STYLE_ID = 'native-bgm-injected-overrides';
     const MENU_BTN_ID = 'st-bgm-ext-btn-v7-0';
-    const SCRIPT_VERSION = '1.4.5';
+    const SCRIPT_VERSION = '1.4.6';
     const EXTENSION_DEFAULT_FOLDER = 'Beautify-and-Replace-Image';
     const EXTENSION_RAW_MANIFEST_URL = 'https://raw.githubusercontent.com/qishiwan16-hub/Beautify-and-Replace-Image/main/manifest.json';
     const BACKEND_BASE_URLS = [
@@ -23,6 +23,7 @@
 
     let isNukingDB = false;
     let blobCache = new Map(); 
+    const blobHashCache = new WeakMap();
 
     function getBlobObjectUrl(blob) {
         if (!blobCache.has(blob)) blobCache.set(blob, URL.createObjectURL(blob));
@@ -79,6 +80,66 @@
         if (!data) return 0;
         if (data instanceof Blob) return (data.size / 1024 / 1024).toFixed(2);
         return ((data.length * 2) / 1024 / 1024).toFixed(2);
+    }
+
+    async function getBlobContentHash(blob) {
+        if (blobHashCache.has(blob)) return blobHashCache.get(blob);
+        const bytes = new Uint8Array(await blob.arrayBuffer());
+        let digest;
+        if (window.crypto?.subtle) {
+            const hash = new Uint8Array(await window.crypto.subtle.digest('SHA-256', bytes));
+            digest = Array.from(hash, value => value.toString(16).padStart(2, '0')).join('');
+        } else {
+            digest = `${zipCrc32(bytes).toString(16).padStart(8, '0')}-${bytes.length}`;
+        }
+        const key = `${bytes.length}:${digest}`;
+        blobHashCache.set(blob, key);
+        return key;
+    }
+
+    async function deduplicateImageBlobs(dataObjects) {
+        const canonical = new Map();
+        let merged = 0;
+        for (const data of dataObjects) {
+            if (!data || typeof data !== 'object') continue;
+            for (const key of Object.keys(data)) {
+                const value = data[key];
+                if (!(value instanceof Blob)) continue;
+                const hash = await getBlobContentHash(value);
+                if (!canonical.has(hash)) {
+                    canonical.set(hash, value);
+                    continue;
+                }
+                const shared = canonical.get(hash);
+                if (shared === value) continue;
+                data[key] = shared;
+                merged += 1;
+            }
+        }
+        return merged;
+    }
+
+    function collectBlobs(value, result = new Set()) {
+        if (value instanceof Blob) {
+            result.add(value);
+            return result;
+        }
+        if (Array.isArray(value)) value.forEach(item => collectBlobs(item, result));
+        else if (value && typeof value === 'object') Object.values(value).forEach(item => collectBlobs(item, result));
+        return result;
+    }
+
+    function releaseDeletedPresetBlobs(deletedPreset, currentData, remainingPresets) {
+        const retained = collectBlobs(currentData);
+        collectBlobs(remainingPresets, retained);
+        let released = 0;
+        collectBlobs(deletedPreset?.data).forEach(blob => {
+            if (retained.has(blob) || !blobCache.has(blob)) return;
+            URL.revokeObjectURL(blobCache.get(blob));
+            blobCache.delete(blob);
+            released += 1;
+        });
+        return released;
     }
 
     function getCurrentThemeName() {
@@ -421,6 +482,49 @@
         if (!presets.some(preset => preset.isActive)) return;
         presets.forEach(preset => { preset.isActive = false; });
         await BGMData.savePresets(themeName, presets);
+    }
+
+    function remapUrlKeyedData(data, mappings) {
+        const source = data && typeof data === 'object' ? data : {};
+        const remapped = { ...source };
+        let changed = 0;
+        mappings.forEach(([oldUrl, newUrl]) => {
+            if (oldUrl === newUrl || !Object.prototype.hasOwnProperty.call(source, oldUrl)) return;
+            delete remapped[oldUrl];
+            changed += 1;
+        });
+        mappings.forEach(([oldUrl, newUrl]) => {
+            if (oldUrl === newUrl || !Object.prototype.hasOwnProperty.call(source, oldUrl)) return;
+            remapped[newUrl] = source[oldUrl];
+        });
+        return { data: remapped, changed };
+    }
+
+    async function migrateThemeUrlKeys(themeName, replacements) {
+        const mapping = new Map();
+        replacements.forEach(replacement => {
+            const oldUrl = String(Array.isArray(replacement) ? replacement[0] : replacement?.oldUrl || '').trim();
+            const newUrl = String(Array.isArray(replacement) ? replacement[1] : replacement?.newUrl || '').trim();
+            if (oldUrl && newUrl && oldUrl !== newUrl) mapping.set(oldUrl, newUrl);
+        });
+        const mappings = Array.from(mapping.entries());
+        if (!mappings.length) return { configKeys: 0, presets: 0, presetKeys: 0 };
+
+        const current = remapUrlKeyedData(await BGMData.loadForTheme(themeName), mappings);
+        if (current.changed) await BGMData.saveForTheme(themeName, current.data);
+
+        const presets = await BGMData.loadPresets(themeName);
+        let changedPresets = 0;
+        let changedPresetKeys = 0;
+        presets.forEach(preset => {
+            const migrated = remapUrlKeyedData(preset.data, mappings);
+            if (!migrated.changed) return;
+            preset.data = migrated.data;
+            changedPresets += 1;
+            changedPresetKeys += migrated.changed;
+        });
+        if (changedPresets) await BGMData.savePresets(themeName, presets);
+        return { configKeys: current.changed, presets: changedPresets, presetKeys: changedPresetKeys };
     }
 
     const BATCH_NAME_SEPARATOR = '\u2014';
@@ -817,6 +921,7 @@
             .bgm-batch-insert-links { min-height: 34px; padding: 8px 14px; border: 1px solid var(--SmartThemeQuoteColor); border-radius: 7px; background: var(--SmartThemeQuoteColor); color: white; cursor: pointer; }
             .bgm-batch-insert-status { min-width: 0; font-size: 0.78em; opacity: 0.65; }
             .bgm-batch-table-body { display: flex; flex-direction: column; gap: 12px; margin-top: 12px; }
+            .bgm-batch-list-loading { min-height: 90px; display: flex; align-items: center; justify-content: center; gap: 7px; font-size: 0.82em; opacity: 0.65; }
             .bgm-batch-table-row { display: grid; grid-template-columns: 56px minmax(0, 1fr); align-items: stretch; overflow: hidden; border: 1px solid rgba(0,0,0,0.1); border-radius: 8px; background: rgba(255,255,255,0.45); }
             .bgm-batch-index { display: flex; align-items: flex-start; justify-content: center; padding-top: 18px; border-right: 1px solid rgba(0,0,0,0.08); text-align: center; font-family: monospace; font-weight: 700; opacity: 0.72; }
             .bgm-batch-card-content { min-width: 0; display: flex; flex-direction: column; gap: 9px; padding: 14px; }
@@ -1165,9 +1270,13 @@
             }
             let linkOrder = 'forward';
             let linksInserted = false;
+            let renderGeneration = 0;
+            let latestRender = Promise.resolve(true);
+            const imageIndexByUrl = new Map(cssOrderedUrls.map((item, index) => [item.originalUrl, index]));
             const orderedItems = () => linkOrder === 'reverse' ? cssOrderedUrls.slice().reverse() : cssOrderedUrls.slice();
-            const buildRows = (lines = []) => orderedItems().map((item, rowIndex) => {
-                const imageIndex = cssOrderedUrls.findIndex(candidate => candidate.originalUrl === item.originalUrl);
+            const buildRows = (lines, items, start, end) => items.slice(start, end).map((item, offset) => {
+                const rowIndex = start + offset;
+                const imageIndex = imageIndexByUrl.get(item.originalUrl);
                 const displayIndex = String(imageIndex + 1).padStart(3, '0');
                 const selector = [...new Set(item.selectors || [])].join(', ') || '未知区域';
                 const newUrl = String(lines[rowIndex] || '').trim();
@@ -1199,7 +1308,7 @@
                     <div class="bgm-batch-order" role="group" aria-label="替换顺序"><button type="button" class="active" data-order="forward">正序</button><button type="button" data-order="reverse">倒序</button></div>
                     <textarea class="bgm-batch-link-lines" placeholder="链接1&#10;空&#10;链接3"></textarea>
                     <div class="bgm-batch-insert-row"><button type="button" class="bgm-batch-insert-links"><i class="fa-solid fa-arrow-down"></i> 插入替换</button><span class="bgm-batch-insert-status" role="status" aria-live="polite"></span></div>
-                    <div class="bgm-batch-table-body">${buildRows()}</div>
+                    <div class="bgm-batch-table-body"><div class="bgm-batch-list-loading"><i class="fa-solid fa-spinner fa-spin"></i><span>正在加载清单...</span></div></div>
                     <div class="bgm-batch-modal-actions"><button type="button" class="bgm-batch-cancel">取消</button><button type="button" class="bgm-batch-confirm">确认替换</button></div>
                 </div>`);
             $popup.find('.bgm-sub-panel').removeClass('active');
@@ -1208,11 +1317,11 @@
             $panel.addClass('active');
             $popup.find('.bgm-content').scrollTop(0);
             const returnToMain = () => {
+                renderGeneration += 1;
                 $panel.removeClass('active').empty().off('.bgmBatchLinks');
                 $popup.find('#panel-main').show();
                 $popup.find('.bgm-content').scrollTop(0);
             };
-            const bindPreviewStates = () => bindBatchPreviewStates($panel);
             const updatePreview = $input => {
                 const value = String($input.val() || '').trim();
                 const $preview = $input.closest('.bgm-batch-table-row').find('.bgm-batch-new-preview');
@@ -1227,15 +1336,31 @@
             };
             const currentLines = () => String($panel.find('.bgm-batch-link-lines').val() || '').replace(/\r/g, '').split('\n');
             const yieldForPaint = () => new Promise(resolve => requestAnimationFrame(() => setTimeout(resolve, 0)));
-            const renderRows = () => {
-                $panel.find('.bgm-batch-table-body').html(buildRows(currentLines()));
-                bindPreviewStates();
+            const renderRows = async () => {
+                const generation = ++renderGeneration;
+                const items = orderedItems();
+                const lines = linksInserted ? currentLines() : [];
+                const $body = $panel.find('.bgm-batch-table-body');
+                $body.html('<div class="bgm-batch-list-loading"><i class="fa-solid fa-spinner fa-spin"></i><span>正在加载清单...</span></div>');
+                await yieldForPaint();
+                if (generation !== renderGeneration || !$panel.hasClass('active')) return false;
+                $body.empty();
+                const chunkSize = 10;
+                for (let start = 0; start < items.length; start += chunkSize) {
+                    if (generation !== renderGeneration || !$panel.hasClass('active')) return false;
+                    const $rows = $(buildRows(lines, items, start, Math.min(start + chunkSize, items.length)));
+                    $body.append($rows);
+                    bindBatchPreviewStates($rows);
+                    if (start + chunkSize < items.length) await new Promise(resolve => requestAnimationFrame(resolve));
+                }
+                return true;
             };
-            bindPreviewStates();
+            const scheduleRender = () => (latestRender = renderRows());
+            scheduleRender();
             $panel.on('click.bgmBatchLinks', '.bgm-batch-order button', function() {
                 linkOrder = String($(this).data('order')) === 'reverse' ? 'reverse' : 'forward';
                 $(this).addClass('active').siblings().removeClass('active');
-                if (linksInserted) renderRows();
+                scheduleRender();
             });
             $panel.on('click.bgmBatchLinks', '.bgm-batch-insert-links', async function() {
                 const inserted = currentLines().filter(line => String(line || '').trim()).length;
@@ -1247,7 +1372,7 @@
                 $status.html('<i class="fa-solid fa-spinner fa-spin"></i> 正在生成逐项预览');
                 await yieldForPaint();
                 linksInserted = true;
-                renderRows();
+                await scheduleRender();
                 $status.text(`已插入 ${inserted} 行`);
                 $button.prop('disabled', false).html(idleHtml);
             });
@@ -1279,24 +1404,28 @@
                 const idleHtml = $button.html();
                 $button.prop('disabled', true).html('<i class="fa-solid fa-spinner fa-spin"></i> 替换中...');
                 await yieldForPaint();
+                await latestRender;
                 let css = String($textarea.val() || ''), replaced = 0;
+                const urlMappings = [];
                 $panel.find('.bgm-batch-table-row').each(function() {
                     const imageIndex = Number($(this).data('image-index'));
                     const $input = $(this).find('.bgm-batch-new-link');
                     const newUrl = String($input.val() || '').trim();
                     const oldUrl = cssOrderedUrls[imageIndex]?.originalUrl;
                     if (!oldUrl || !newUrl || newUrl === '空' || newUrl === oldUrl) return;
-                    css = css.split(oldUrl).join(newUrl); replaced += 1;
+                    css = css.split(oldUrl).join(newUrl);
+                    urlMappings.push([oldUrl, newUrl]);
+                    replaced += 1;
                 });
                 if (!replaced) {
                     $button.prop('disabled', false).html(idleHtml);
                     if (window.toastr) toastr.warning('没有需要替换的链接');
                     return;
                 }
+                const migration = await migrateThemeUrlKeys(currentTheme, urlMappings);
                 $textarea.val(css).trigger('input');
-                await clearActivePreset(currentTheme);
                 returnToMain();
-                if (window.toastr) toastr.success(`已替换 ${replaced} 个链接，请在酒馆主题界面自行保存`);
+                if (window.toastr) toastr.success(`已替换 ${replaced} 个链接${migration.presets ? `，已继承 ${migration.presets} 个预设` : ''}，请在酒馆主题界面自行保存`);
                 await refreshList();
             });
         };
@@ -1518,15 +1647,16 @@
                 });
                 if (!matches.size) throw new Error('没有文件名能匹配当前美化的图片序号或原图名称');
                 const data = await BGMData.loadForTheme(currentTheme);
-                matches.forEach((file, index) => { data[cssOrderedUrls[index].originalUrl] = file; });
-                await BGMData.saveForTheme(currentTheme, data);
                 const presets = await BGMData.loadPresets(currentTheme);
+                matches.forEach((file, index) => { data[cssOrderedUrls[index].originalUrl] = file; });
+                const mergedDuplicates = await deduplicateImageBlobs([data, ...presets.map(preset => preset.data)]);
+                await BGMData.saveForTheme(currentTheme, data);
                 presets.forEach(preset => { preset.isActive = false; });
                 presets.push({ id: createPresetId(), name: '本地图片替换版', data: { ...data }, isActive: true });
                 await BGMData.savePresets(currentTheme, presets);
                 await applyInjectedOverrides();
                 await refreshList();
-                if (window.toastr) toastr[unmatched.length ? 'warning' : 'success'](unmatched.length ? `批量导入完成：成功 ${matches.size} 张，${unmatched.length} 个文件名未匹配` : `批量导入完成：已替换 ${matches.size} 张并保存预设“本地图片替换版”`);
+                if (window.toastr) toastr[unmatched.length ? 'warning' : 'success'](unmatched.length ? `批量导入完成：成功 ${matches.size} 张，${unmatched.length} 个文件名未匹配` : `批量导入完成：已替换 ${matches.size} 张并保存预设“本地图片替换版”${mergedDuplicates ? `，合并 ${mergedDuplicates} 张重复图片` : ''}`);
             } catch (error) {
                 if (window.toastr) toastr.error(`批量导入失败：${error && error.message || error}`);
             } finally {
@@ -1542,11 +1672,12 @@
             const newUrl = prompt(`要替换的目标链接：\n${targetUrl}\n\n输入新的图片链接：`, targetUrl);
             if (newUrl !== null && newUrl.trim() !== '' && newUrl.trim() !== targetUrl) {
                 const $ta = getCssTextarea();
+                const normalizedNewUrl = newUrl.trim();
                 let css = $ta.val();
-                css = css.split(targetUrl).join(newUrl.trim());
+                css = css.split(targetUrl).join(normalizedNewUrl);
+                const migration = await migrateThemeUrlKeys(currentTheme, [[targetUrl, normalizedNewUrl]]);
                 $ta.val(css).trigger('input'); 
-                await clearActivePreset(currentTheme);
-                if (window.toastr) toastr.success("CSS 源码链接已修改");
+                if (window.toastr) toastr.success(migration.presets ? `CSS 链接已修改，已继承 ${migration.presets} 个预设` : 'CSS 源码链接已修改');
                 refreshList();
             }
         });
@@ -1636,6 +1767,7 @@
             if (name && name.trim()) {
                 const data = await BGMData.loadForTheme(currentTheme);
                 let presets = await BGMData.loadPresets(currentTheme);
+                await deduplicateImageBlobs([data, ...presets.map(preset => preset.data)]);
                 presets.forEach(preset => { preset.isActive = false; });
                 presets.push({ id: createPresetId(), name: name.trim(), data, isActive: true });
                 await BGMData.savePresets(currentTheme, presets);
@@ -1680,6 +1812,7 @@
             const preset = presets[index];
             if (!preset || !confirm(`用当前配置覆盖预设“${preset.name}”？`)) return;
             preset.data = await BGMData.loadForTheme(currentTheme);
+            await deduplicateImageBlobs(presets.map(item => item.data));
             presets.forEach((item, presetIndex) => { item.isActive = presetIndex === index; });
             await BGMData.savePresets(currentTheme, presets);
             await renderPresets();
@@ -1689,9 +1822,13 @@
         $popup.on('click', '.bgm-icon-btn.del', async function() {
             if (confirm("删除预设？")) {
                 let presets = await BGMData.loadPresets(currentTheme);
-                presets.splice($(this).data('index'), 1);
+                const deleted = presets.splice(Number($(this).data('index')), 1)[0];
+                if (!deleted) return;
                 await BGMData.savePresets(currentTheme, presets);
+                const currentData = await BGMData.loadForTheme(currentTheme);
+                const released = releaseDeletedPresetBlobs(deleted, currentData, presets);
                 await renderPresets();
+                if (window.toastr) toastr.success(released ? `预设已删除，并释放 ${released} 个图片缓存` : '预设及其未使用图片已删除');
             }
         });
 
@@ -1921,6 +2058,7 @@
             const data = await BGMData.loadForTheme(theme);
             
             data[currentTargetUrl] = file; // 直接存储文件对象（Blob）
+            await deduplicateImageBlobs([data]);
             
             await BGMData.saveForTheme(theme, data);
             await clearActivePreset(theme);
