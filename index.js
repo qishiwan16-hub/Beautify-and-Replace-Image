@@ -5,7 +5,7 @@
     const STYLE_ID = 'native-bgm-style-v7-0'; 
     const INJECT_STYLE_ID = 'native-bgm-injected-overrides';
     const MENU_BTN_ID = 'st-bgm-ext-btn-v7-0';
-    const SCRIPT_VERSION = '1.4.0';
+    const SCRIPT_VERSION = '1.4.1';
     const EXTENSION_DEFAULT_FOLDER = 'Beautify-and-Replace-Image';
     const EXTENSION_RAW_MANIFEST_URL = 'https://raw.githubusercontent.com/qishiwan16-hub/Beautify-and-Replace-Image/main/manifest.json';
     const BACKEND_BASE_URLS = [
@@ -251,7 +251,7 @@
             if (!response.ok) throw new Error((await response.text()) || response.statusText || `HTTP ${response.status}`);
             return response.json();
         },
-        async detect(force = false) {
+        async detect(force = false, signal = null) {
             if (this.detectPromise && !force) return this.detectPromise;
             if (!force && this.mode === 'server') return this.mode;
             if (!force && this.mode === 'local' && Date.now() - this.lastDetectionAt < 15000) return this.mode;
@@ -261,13 +261,14 @@
                 for (const baseUrl of BACKEND_BASE_URLS) {
                     this.baseUrl = baseUrl;
                     try {
-                        const status = await this.request('/status');
+                        const status = await this.request('/status', { signal });
                         if (status && status.ok) {
                             this.mode = 'server';
                             this.state = null;
                             return this.mode;
                         }
                     } catch (error) {
+                        if (error && error.name === 'AbortError') throw error;
                         this.lastError = String(error && error.message || error);
                     }
                 }
@@ -488,6 +489,29 @@
         const link = document.createElement('a');
         link.href = url; link.download = filename; document.body.appendChild(link); link.click(); link.remove();
         setTimeout(() => URL.revokeObjectURL(url), 1000);
+    }
+
+    async function uploadBatchZip(blob, filename) {
+        if (serverStorage.mode !== 'server') throw new Error('后端未连接，请更新并启用主题一键换图后端');
+        const headers = { ...serverStorage.getRequestHeaders(), 'Content-Type': 'application/zip' };
+        const response = await fetch(`${serverStorage.baseUrl}/downloads?filename=${encodeURIComponent(filename)}`, {
+            method: 'POST', headers, body: blob, credentials: 'same-origin', cache: 'no-store'
+        });
+        if (!response.ok) throw new Error((await response.text()) || `HTTP ${response.status}`);
+        const result = await response.json();
+        if (!result || !result.ok || !result.url) throw new Error('后端没有返回下载地址');
+        return { ...result, absoluteUrl: new URL(result.url, window.location.href).href };
+    }
+
+    async function copyTextValue(value, input) {
+        try {
+            await navigator.clipboard.writeText(value);
+            return true;
+        } catch (error) {
+            if (!input) return false;
+            input.focus(); input.select();
+            try { return document.execCommand('copy'); } catch (copyError) { return false; }
+        }
     }
 
     function storageLabel() {
@@ -752,6 +776,12 @@
             .bgm-batch-modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; }
             .bgm-batch-modal-actions button { padding: 8px 14px; border-radius: 8px; border: 1px solid rgba(0,0,0,0.12); background: rgba(255,255,255,0.64); color: inherit; cursor: pointer; }
             .bgm-batch-modal-actions .bgm-batch-confirm { border-color: var(--SmartThemeQuoteColor); background: var(--SmartThemeQuoteColor); color: white; }
+            .bgm-download-result-box { width: min(560px, 94vw); }
+            .bgm-download-result-row { display: flex; gap: 7px; margin-top: 10px; }
+            .bgm-download-result-url { flex: 1; min-width: 0; box-sizing: border-box; padding: 8px 10px; border: 1px solid rgba(0,0,0,0.14); border-radius: 8px; background: rgba(255,255,255,0.72); color: inherit; }
+            .bgm-download-result-copy { flex: 0 0 auto; padding: 8px 14px; border: 0; border-radius: 8px; background: var(--SmartThemeQuoteColor); color: white; cursor: pointer; }
+            .bgm-download-result-note { margin-top: 8px; font-size: 0.78em; opacity: 0.66; line-height: 1.45; overflow-wrap: anywhere; }
+            .bgm-batch-dark .bgm-download-result-url { background: rgba(0,0,0,0.4); border-color: rgba(255,255,255,0.16); color: #eee; }
             @media (max-width: 640px) { .bgm-batch-table-head, .bgm-batch-table-row { grid-template-columns: 34px minmax(0, 1fr) minmax(0, 1fr); gap: 4px; } .bgm-batch-link-cell { flex-direction: column; align-items: stretch; } .bgm-batch-link-cell img { width: 100%; height: 54px; flex-basis: 54px; } .bgm-batch-link-cell > div { display: none; } }
 
             @media (max-width: 600px) {
@@ -933,7 +963,29 @@
         $popup.find('#bgm-batch-import-images').html('<i class="fa-solid fa-file-arrow-up"></i> &#25209;&#37327;&#23548;&#20837;');
         $popup.find('#bgm-batch-import-links').html('<i class="fa-solid fa-link"></i> &#38142;&#25509;&#23548;&#20837;');
 
+        const panelAbortController = new AbortController();
+        let popupClosed = false;
+        const showBatchDownloadResult = ({ zip, filename, directUrl = '', directError = '', expiresAt = '' }) => {
+            $('.bgm-download-result-modal').remove();
+            const linkContent = directUrl
+                ? `<div class="bgm-download-result-row"><input class="bgm-download-result-url" readonly value="${escapeHtml(directUrl)}"><button type="button" class="bgm-download-result-copy"><i class="fa-solid fa-copy"></i> 复制</button></div><div class="bgm-download-result-note">直链约 24 小时后失效${expiresAt ? `，有效期至 ${escapeHtml(new Date(expiresAt).toLocaleString())}` : ''}。其他浏览器需能访问当前酒馆地址。</div>`
+                : `<div class="bgm-download-result-note">未生成直链：${escapeHtml(directError || '主题后端未连接或版本过旧')}。本地 ZIP 已正常下载。</div>`;
+            const $modal = $(`<div class="bgm-batch-modal bgm-download-result-modal"><div class="bgm-batch-modal-box bgm-download-result-box ${isDarkMode ? 'bgm-batch-dark' : ''}"><div class="bgm-batch-modal-title"><i class="fa-solid fa-file-zipper"></i> 批量下载完成</div><div class="bgm-batch-modal-hint">${escapeHtml(filename)}</div>${linkContent}<div class="bgm-batch-modal-actions"><button type="button" class="bgm-batch-cancel">关闭</button><button type="button" class="bgm-batch-confirm bgm-download-again"><i class="fa-solid fa-download"></i> 再次下载</button></div></div></div>`);
+            $('body').append($modal);
+            const close = () => $modal.remove();
+            $modal.on('click', '.bgm-batch-cancel', close);
+            $modal.on('click', event => { if ($(event.target).is('.bgm-batch-modal')) close(); });
+            $modal.on('click', '.bgm-download-again', () => downloadBatchBlob(zip, filename));
+            $modal.on('click', '.bgm-download-result-copy', async function() {
+                const $input = $modal.find('.bgm-download-result-url');
+                const copied = await copyTextValue(directUrl, $input[0]);
+                if (window.toastr) toastr[copied ? 'success' : 'error'](copied ? '直链已复制' : '复制失败，请手动选择链接');
+            });
+        };
+
         const closePopup = () => {
+            popupClosed = true;
+            panelAbortController.abort();
             $('.bgm-batch-modal').remove();
             $popup.fadeOut(200, () => $popup.remove());
         };
@@ -1072,7 +1124,18 @@
             }
             if (entries.length) {
                 const zip = await createBatchZip(entries);
-                downloadBatchBlob(zip, `${sanitizeFileName(currentTheme)}-${batchTimestamp()}.zip`);
+                const filename = `${sanitizeFileName(currentTheme)}-${batchTimestamp()}.zip`;
+                downloadBatchBlob(zip, filename);
+                let directUrl = '', directError = '', expiresAt = '';
+                $button.html('<i class="fa-solid fa-link"></i> 生成直链');
+                try {
+                    const uploaded = await uploadBatchZip(zip, filename);
+                    directUrl = uploaded.absoluteUrl;
+                    expiresAt = uploaded.expiresAt || '';
+                } catch (error) {
+                    directError = String(error && error.message || error);
+                }
+                showBatchDownloadResult({ zip, filename, directUrl, directError, expiresAt });
                 if (window.toastr) toastr[failed.length ? 'warning' : 'success'](failed.length ? `下载完成，${failed.length} 张失败，详情见 TXT` : `已下载 ${cssOrderedUrls.length} 张图片`);
             }
             $button.prop('disabled', false).html(oldHtml);
@@ -1380,7 +1443,10 @@
 
             $popup.find('#action-detect-backend').on('click', async function() {
                 $(this).prop('disabled', true).text('检测中...');
-                const mode = await serverStorage.detect(true);
+                let mode;
+                try { mode = await serverStorage.detect(true, panelAbortController.signal); }
+                catch (error) { if (error && error.name === 'AbortError') return; throw error; }
+                if (popupClosed) return;
                 if (window.toastr) {
                     if (mode === 'server') toastr.success(`后端连接成功：${serverStorage.baseUrl}`);
                     else toastr.error(`后端未连接${serverStorage.lastError ? `：${serverStorage.lastError}` : ''}`);
@@ -1390,7 +1456,8 @@
 
             $popup.find('#action-check-update').on('click', async function() {
                 $(this).prop('disabled', true).text('检查中...');
-                await checkExtensionUpdate();
+                await checkExtensionUpdate(panelAbortController.signal);
+                if (popupClosed) return;
                 if (window.toastr) {
                     const level = extensionUpdateState.phase === 'error' ? 'error' : 'success';
                     toastr[level](extensionUpdateState.message);
@@ -1519,7 +1586,8 @@
                 if (window.token) headers['X-CSRF-Token'] = window.token;
                 const response = await fetch(`/api/extensions/${endpoint}`, {
                     method: 'POST', headers,
-                    body: JSON.stringify({ extensionName, global })
+                    body: JSON.stringify({ extensionName, global }),
+                    signal: options.signal
                 });
                 if (response.ok) return { data: await response.json(), extensionName, global };
                 lastError = (await response.text()) || response.statusText || lastError;
@@ -1529,28 +1597,34 @@
         throw new Error(lastError);
     }
 
-    async function getLatestManifestVersion() {
+    async function getLatestManifestVersion(signal = null) {
         try {
-            const response = await fetch(`${EXTENSION_RAW_MANIFEST_URL}?bri=${Date.now()}`, { cache: 'no-store' });
+            const response = await fetch(`${EXTENSION_RAW_MANIFEST_URL}?bri=${Date.now()}`, { cache: 'no-store', signal });
             if (!response.ok) return '';
             const manifest = await response.json();
             return String(manifest.version || '').trim();
-        } catch (error) { return ''; }
+        } catch (error) { if (error && error.name === 'AbortError') throw error; return ''; }
     }
 
-    async function checkExtensionUpdate() {
+    async function checkExtensionUpdate(signal = null) {
         extensionUpdateState.phase = 'checking';
         try {
-            const result = await requestExtensionApi('version');
+            const result = await requestExtensionApi('version', { signal });
             extensionUpdateState.extensionName = result.extensionName;
             extensionUpdateState.global = result.global;
-            extensionUpdateState.latestVersion = await getLatestManifestVersion();
+            extensionUpdateState.latestVersion = await getLatestManifestVersion(signal);
             extensionUpdateState.canUpdate = result.data && result.data.isUpToDate === false;
             extensionUpdateState.phase = extensionUpdateState.canUpdate ? 'available' : 'latest';
             extensionUpdateState.message = extensionUpdateState.canUpdate
                 ? `发现新版本${extensionUpdateState.latestVersion ? ` v${extensionUpdateState.latestVersion}` : ''}`
                 : `当前已是最新版本 v${SCRIPT_VERSION}`;
         } catch (error) {
+            if (error && error.name === 'AbortError') {
+                extensionUpdateState.phase = 'idle';
+                extensionUpdateState.message = '检查已取消';
+                extensionUpdateState.canUpdate = false;
+                return extensionUpdateState;
+            }
             extensionUpdateState.phase = 'error';
             extensionUpdateState.canUpdate = false;
             extensionUpdateState.message = `检查失败：${error.message || error}`;
